@@ -1,0 +1,1 @@
+{"dataset": "nightreid", "num_cameras": 7, "camera_to_description": {"cam1": "x46E", "cam2": "el7d", "cam3": "Bwh2", "cam4": "SOHz", "cam5": "DApu", "cam6": "3iLj", "cam7": "9TaR"}, "description_to_camera": {"x46E": "cam1", "el7d": "cam2", "Bwh2": "cam3", "SOHz": "cam4", "DApu": "cam5", "3iLj": "cam6", "9TaR": "cam7"}}

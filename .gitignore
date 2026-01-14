@@ -1,0 +1,4 @@
+Data_Generation/finetune_model/
+Data_Generation/outputs/
+stable-diffusion-v1-5/
+dataset/

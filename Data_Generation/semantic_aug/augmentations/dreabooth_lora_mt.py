@@ -222,8 +222,8 @@ class DreamboothLoraGeneration(GenerativeMixup):
             scheduler = DPMSolverMultistepScheduler.from_config(DreamboothLoraGeneration.pipe.scheduler.config, local_files_only=True)
             self.placeholder2name = None
             self.name2placeholder = None
-            if embed_path is not None:
-                self.name2placeholder, self.placeholder2name = load_diffmix_embeddings(embed_path, DreamboothLoraGeneration.pipe.text_encoder, DreamboothLoraGeneration.pipe.tokenizer)
+            # if embed_path is not None:
+            #     self.name2placeholder, self.placeholder2name = load_diffmix_embeddings(embed_path, DreamboothLoraGeneration.pipe.text_encoder, DreamboothLoraGeneration.pipe.tokenizer)
             if lora_path is not None:
                 DreamboothLoraGeneration.pipe.load_lora_weights(lora_path)
             DreamboothLoraGeneration.pipe.scheduler = scheduler

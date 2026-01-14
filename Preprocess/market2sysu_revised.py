@@ -24,7 +24,7 @@ def main():
     parser.add_argument(
         "--max_sysu_id",
         type=int,
-        default=533,
+        default=500,
         help="Current maximum SYSU ID (default 533, can be changed dynamically)"
     )
     parser.add_argument(

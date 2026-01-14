@@ -273,7 +273,7 @@ if __name__ == "__main__":
     parser.add_argument("--debug", action="store_true", help="Use debugging mode (single-process).")
     parser.add_argument("--cameras", nargs="+", default=None, help="List of camera names or descriptions to process (e.g. cam1 cam2). If not set, we gather all unique cameras from the dataset.")
     parser.add_argument("--repeat_each_id", type=int, default=1, help="How many times to enqueue each ID in every camera.")
-    parser.add_argument("--threshold", type=int, default=533, help="Ignore classes with numeric ID <= this threshold.")
+    parser.add_argument("--threshold", type=int, default=500, help="Ignore classes with numeric ID <= this threshold.")
     parser.add_argument("--images_per_call", type=int, default=1, help="Number of images generated per pipeline call.")
     parser.add_argument("--model_path", type=str, default="CompVis/stable-diffusion-v1-4", help="Base model path.")
     parser.add_argument("--lora_path", type=str, default='finetune_model/lora_ti/pytorch_lora_weights.safetensors', help="path to lora")

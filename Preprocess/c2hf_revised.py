@@ -58,12 +58,13 @@ def main():
 
     # Paths
     train_id_path = os.path.join(base_path, "exp", "train_id.txt")
-    val_id_path = os.path.join(base_path, "exp", "val_id.txt")
+    # val_id_path = os.path.join(base_path, "exp", "val_id.txt")
 
-    # Read IDs
-    train_ids = read_ids(train_id_path)
-    val_ids = read_ids(val_id_path)
-    all_ids = sorted(train_ids + val_ids, key=int)
+    # # Read IDs
+    # train_ids = read_ids(train_id_path)
+    # val_ids = read_ids(val_id_path)
+    # all_ids = sorted(train_ids + val_ids, key=int)
+    all_ids = read_ids(train_id_path)
 
     # Create label mapping
     id_to_label = {id_str: i for i, id_str in enumerate(all_ids)}
