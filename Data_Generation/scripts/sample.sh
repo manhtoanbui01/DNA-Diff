@@ -24,7 +24,7 @@ function sample {
     python generate_t2i.py \
     --output_path "$output_dir" \
     --resolution $resolution \
-    --gpu_ids 0 2 3 4 5 6 7 \
+    --gpu_ids 0 1 2 3 4 5 6 7 \
     --cameras cam1 cam2 cam3 cam4 cam5 cam6 \
     --repeat_each_id 3 \
     --batch_size 16 \
