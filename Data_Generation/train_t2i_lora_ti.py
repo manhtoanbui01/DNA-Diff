@@ -48,6 +48,7 @@ from diffusers.utils import check_min_version, is_wandb_available
 from diffusers.utils.import_utils import is_xformers_available
 
 from typing import Any, Tuple, Dict
+from lora_ipadapter import LoRAIPAdapterAttnProcessor, ImageProjModel
 
 # os.environ["http_proxy"]="http://localhost:8890"
 # os.environ["https_proxy"]="http://localhost:8890"
@@ -423,6 +424,22 @@ def main():
     # freeze parameters of models to save more memory
     unet.requires_grad_(False)
     vae.requires_grad_(False)
+    from deep_person_reid.torchreid.utils import FeatureExtractor
+    osnet = FeatureExtractor(
+        model_name='osnet_ain_x1_0',
+        model_path='deep_person_reid/osnet_ain_ms_d_m.pth.tar',
+        # device='cuda:0'
+    )
+    osnet.model.eval()
+    osnet.model.requires_grad_(False)
+    
+    image_proj_model = ImageProjModel(
+        cross_attention_dim=unet.config.cross_attention_dim,
+        ip_embeddings_dim=512,
+        ip_extra_context_tokens=4,
+    )
+    image_proj_model.train()
+    image_proj_model.requires_grad_(True)
 
     # text_encoder.requires_grad_(False)
 
@@ -437,6 +454,8 @@ def main():
     # Move unet, vae and text_encoder to device and cast to weight_dtype
     unet.to(accelerator.device, dtype=weight_dtype)
     vae.to(accelerator.device, dtype=weight_dtype)
+    osnet = osnet.model.to(accelerator.device)
+    image_proj_model.to(accelerator.device)
     text_encoder.to(accelerator.device, dtype=weight_dtype)
     text_encoder.text_model.embeddings.token_embedding.weight.data = text_encoder.get_input_embeddings().weight.data.float()
 #endregion
@@ -481,23 +500,10 @@ def main():
     index_no_updates[placeholder_token_ids] = False #index_no_updates用来区分可学习的embedding和不可学习的embedding
 
 
-#region add LoRA to unet
 
-    # now we will add new LoRA weights to the attention layers
-    # It's important to realize here how many attention weights will be added and of which sizes
-    # The sizes of the attention layers consist only of two different variables:
-    # 1) - the "hidden_size", which is increased according to `unet.config.block_out_channels`.
-    # 2) - the "cross attention size", which is set to `unet.config.cross_attention_dim`.
-
-    # Let's first see how many attention processors we will have to set.
-    # For Stable Diffusion, it should be equal to:
-    # - down blocks (2x attention layers) * (2x transformer layers) * (3x down blocks) = 12
-    # - mid blocks (2x attention layers) * (1x transformer layers) * (1x mid blocks) = 2
-    # - up blocks (2x attention layers) * (3x transformer layers) * (3x down blocks) = 18
-    # => 32 layers
 
     # Set correct lora layers
-    lora_attn_procs = {}
+    lora_ipadapter_attn_procs = {}
     for name in unet.attn_processors.keys():
         cross_attention_dim = None if name.endswith("attn1.processor") else unet.config.cross_attention_dim
         if name.startswith("mid_block"):
@@ -509,13 +515,20 @@ def main():
             block_id = int(name[len("down_blocks.")])
             hidden_size = unet.config.block_out_channels[block_id]
 
-        lora_attn_procs[name] = LoRAAttnProcessor(
-            hidden_size=hidden_size,
-            cross_attention_dim=cross_attention_dim,
-            rank=args.rank,
-        )
+        if cross_attention_dim:
+            lora_ipadapter_attn_procs[name] = LoRAIPAdapterAttnProcessor(
+                hidden_size=hidden_size,
+                cross_attention_dim=cross_attention_dim,
+                lora_rank=args.rank,
+            )
+        else:
+            lora_ipadapter_attn_procs[name] = LoRAAttnProcessor(
+                hidden_size=hidden_size,
+                cross_attention_dim=cross_attention_dim,
+                rank=args.rank,
+            )
 
-    unet.set_attn_processor(lora_attn_procs)
+    unet.set_attn_processor(lora_ipadapter_attn_procs)
 
     if args.enable_xformers_memory_efficient_attention:
         if is_xformers_available():
@@ -584,6 +597,7 @@ def main():
 
     optimizer = optimizer_cls(
         [{'params': lora_layers.parameters(), 'lr': args.learning_rate if not args.ti_only else 0},
+         {'params': image_proj_model.parameters(), 'lr': args.learning_rate},
          {'params': text_encoder.get_input_embeddings().parameters(), 'lr': args.ti_learning_rate}], # 这样做的一个好处是可以用accelerate的pipe统一管理checkpoint
         betas=(args.adam_beta1, args.adam_beta2),
         weight_decay=args.adam_weight_decay,
