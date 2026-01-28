@@ -1,0 +1,1 @@
+{"dataset": "nightreid_market1501", "num_cameras": 7, "camera_to_description": {"cam1": "YsFy", "cam2": "kH3A", "cam3": "MaEe", "cam4": "5VZX", "cam5": "78nx", "cam6": "wuGU", "cam7": "J6bh"}, "description_to_camera": {"YsFy": "cam1", "kH3A": "cam2", "MaEe": "cam3", "5VZX": "cam4", "78nx": "cam5", "wuGU": "cam6", "J6bh": "cam7"}}

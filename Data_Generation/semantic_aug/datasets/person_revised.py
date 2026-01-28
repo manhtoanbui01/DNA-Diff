@@ -180,12 +180,16 @@ class PersonHugDataset(HugFewShotDataset):
 
     def get_label_by_idx(self, idx: int) -> int:
         return self.dataset[idx]['label']
+    
+    def get_cond_embed_by_idx(self, idx: int) -> list:
+        return torch.tensor(self.dataset[idx]['cond_embed'])
 
     def get_metadata_by_idx(self, idx: int) -> dict:
         return dict(
             name=self.label2class[self.get_label_by_idx(idx)],
             super_class=self.super_class_name
         )
+    
 
 class PersonHugDatasetForT2I(torch.utils.data.Dataset):
 
@@ -278,13 +282,17 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
         
         return len(self.dataset)
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, int]:
+    def __getitem__(self, idx: int) -> dict:
         # import pdb;pdb.set_trace()
         image = self.get_image_by_idx(idx)
         prompt = self.get_prompt_by_idx(idx)
+        cond_embed = self.get_cond_embed_by_idx(idx)
         # label = self.get_label_by_idx(idx)
 
-        return dict(pixel_values=self.transform(image), caption = prompt)
+        return dict(pixel_values=self.transform(image), cond_embed=cond_embed, caption = prompt)
+
+    def get_cond_embed_by_idx(self, idx: int) -> list:
+        return torch.tensor(self.dataset[idx]['cond_embed'])
     
     def get_image_by_idx(self, idx: int) -> Image.Image:
 

@@ -425,13 +425,13 @@ def main():
     unet.requires_grad_(False)
     vae.requires_grad_(False)
     from deep_person_reid.torchreid.utils import FeatureExtractor
-    osnet = FeatureExtractor(
-        model_name='osnet_ain_x1_0',
-        model_path='deep_person_reid/osnet_ain_ms_d_m.pth.tar',
-        # device='cuda:0'
-    )
-    osnet.model.eval()
-    osnet.model.requires_grad_(False)
+    # osnet = FeatureExtractor(
+    #     model_name='osnet_ain_x1_0',
+    #     model_path='deep_person_reid/osnet_ain_ms_d_m.pth.tar',
+    #     # device='cuda:0'
+    # )
+    # osnet.model.eval()
+    # osnet.model.requires_grad_(False)
     
     image_proj_model = ImageProjModel(
         cross_attention_dim=unet.config.cross_attention_dim,
@@ -446,15 +446,15 @@ def main():
     # For mixed precision training we cast all non-trainable weigths (vae, non-lora text_encoder and non-lora unet) to half-precision
     # as these weights are only used for inference, keeping weights in full precision is not required.
     weight_dtype = torch.float32
-    if accelerator.mixed_precision == "fp16":
-        weight_dtype = torch.float16
-    elif accelerator.mixed_precision == "bf16":
-        weight_dtype = torch.bfloat16
+    # if accelerator.mixed_precision == "fp16":
+    #     weight_dtype = torch.float16
+    # elif accelerator.mixed_precision == "bf16":
+    #     weight_dtype = torch.bfloat16
 
     # Move unet, vae and text_encoder to device and cast to weight_dtype
     unet.to(accelerator.device, dtype=weight_dtype)
     vae.to(accelerator.device, dtype=weight_dtype)
-    osnet = osnet.model.to(accelerator.device)
+    # osnet = osnet.model.to(accelerator.device)
     image_proj_model.to(accelerator.device)
     text_encoder.to(accelerator.device, dtype=weight_dtype)
     text_encoder.text_model.embeddings.token_embedding.weight.data = text_encoder.get_input_embeddings().weight.data.float()
@@ -637,9 +637,10 @@ def main():
         # import pdb;pdb.set_trace()
         pixel_values = torch.stack([example["pixel_values"] for example in examples])
         pixel_values = pixel_values.to(memory_format=torch.contiguous_format).float()
+        cond_embeds = torch.stack([example["cond_embed"] for example in examples])
         input_ids = tokenize_captions(examples) #'a jCmLmYM5 photo of a <class_599> person'
         # input_ids = torch.stack([example["input_ids"] for example in input_ids])
-        return {"pixel_values": pixel_values, "input_ids": input_ids}
+        return {"pixel_values": pixel_values, "cond_embeds": cond_embeds, "input_ids": input_ids}
 
     # DataLoaders creation:
     train_dataloader = torch.utils.data.DataLoader(
@@ -668,8 +669,8 @@ def main():
 #endregion
 
     # Prepare everything with our `accelerator`.
-    lora_layers, text_encoder, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
-        lora_layers, text_encoder, optimizer, train_dataloader, lr_scheduler
+    lora_layers, image_proj_model, text_encoder, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
+        lora_layers, image_proj_model, text_encoder, optimizer, train_dataloader, lr_scheduler
     )
 #region Training info and resume
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
@@ -765,7 +766,9 @@ def main():
                 # import pdb;pdb.set_trace()
                 # Get the text embedding for conditioning
                 encoder_hidden_states = text_encoder(batch["input_ids"])[0].to(dtype=weight_dtype) #[16, 77, 768] batch["input_ids"] [16, 77]
-
+                osnet_embeds = batch["cond_embeds"]
+                ipadapter_embeds = image_proj_model(osnet_embeds)
+                encoder_hidden_states = (encoder_hidden_states, ipadapter_embeds)
                 # Get the target for loss depending on the prediction type
                 if args.prediction_type is not None:
                     # set prediction_type of scheduler if defined
@@ -877,6 +880,11 @@ def main():
         unet.save_attn_procs(args.output_dir)
         weight_name = (
             f"learned_embeds-steps-last.bin"
+        )
+        image_proj_model_to_save = accelerator.unwrap_model(image_proj_model)
+        torch.save(
+            image_proj_model_to_save.state_dict(),
+            os.path.join(args.output_dir, "image_proj_model.bin")
         )
         save_progress(
             text_encoder,

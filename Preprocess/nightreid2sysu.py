@@ -16,7 +16,7 @@ def main():
     parser.add_argument(
         "--output_dir",
         type=str,
-        default="dataset/NightReID",
+        default="dataset/NightReID_Market1501_ori_with_ipadapter",
         help="Output path of the NightReID dataset"
     )
     args = parser.parse_args()

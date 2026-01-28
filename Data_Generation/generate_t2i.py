@@ -23,7 +23,7 @@ from queue import Empty
     
 def generate_translations(args, in_queue, out_queue, gpu_id):
     model = DreamboothLoraGeneration(
-        lora_path=args.lora_path,
+        checkpoint_path='/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_with_ipadapter/finetune_model/lora_ti/checkpoint-25000/',
         model_path=args.model_path,
         embed_path=args.embed_path,
         prompt=args.prompt,
@@ -39,17 +39,19 @@ def generate_translations(args, in_queue, out_queue, gpu_id):
         cam_names = []
         descriptions = []
         class_ids = []
+        cond_embeds = []
         strengths = []
 
         # 1) Pull from queue in mini-batches
         for _ in range(batch_size):
             try:
                 # Now the queue items are (i_list, cam_name, desc, class_id, strength)
-                q_i_list, q_cam_name, q_desc, q_class_id, q_strength = in_queue.get(timeout=1)
+                q_i_list, q_cam_name, q_desc, q_class_id, q_cond_embed, q_strength = in_queue.get(timeout=1)
                 i_lists.append(q_i_list)
                 cam_names.append(q_cam_name)
                 descriptions.append(q_desc)
                 class_ids.append(q_class_id)
+                cond_embeds.append(q_cond_embed)
                 strengths.append(q_strength)
             except Empty:
                 print("Queue empty, exiting.")
@@ -60,11 +62,12 @@ def generate_translations(args, in_queue, out_queue, gpu_id):
 
         # 2) Generate for each item in the batch
         results = []
-        for i_list, cam, desc, nm, stg in zip(i_lists, cam_names, descriptions, class_ids, strengths):
+        for i_list, cam, desc, nm, cond_embed, stg in zip(i_lists, cam_names, descriptions, class_ids, cond_embeds, strengths):
             metadata = {
                 "camera_name": cam,
                 "description": desc,
-                "class_id": nm
+                "class_id": nm,
+                "cond_embed": cond_embed,
             }
 
             # We create a random seed for each image in i_list.
@@ -151,10 +154,32 @@ def build_queue_via_metadata(
             continue
 
         cam_desc_str = camera_to_description[cam_name]
+        
+        label2embed = {}
+
+        for i in range(len(dataset_obj)):
+            label = dataset_obj.get_label_by_idx(i)  # label is int
+            if label not in label2embed:
+                label2embed[label] = dataset_obj.get_cond_embed_by_idx(i)
+        # print(label2embed.keys())
 
         for class_id in all_class_ids:
             if int(class_id) <= threshold:
                 continue
+            if int(class_id) not in label2embed:
+                continue
+            cond_embed = label2embed[int(class_id)]
+            
+            # found = False
+
+            # for i in range(len(dataset_obj)):
+            #     if dataset_obj.get_label_by_idx(i) == int(class_id):
+            #         cond_embed = dataset_obj.get_cond_embed_by_idx(i)
+            #         found = True
+            #         break
+
+            # if not found:
+            #     raise ValueError(f"There is no cond_embed for class_id={class_id}")
 
             # We'll produce 'repeat_each_id' total images for this camera->class combo,
             # but in chunks of size (images_per_call) to reduce pipeline calls.
@@ -169,7 +194,7 @@ def build_queue_via_metadata(
                 i_list = list(range(chunk_start, chunk_end))
 
                 # Enqueue i_list (rather than a single i)
-                in_queue.put((i_list, cam_name, cam_desc_str, class_id, strength))
+                in_queue.put((i_list, cam_name, cam_desc_str, class_id, cond_embed, strength))
 
             # Advance overall index_counter by 'repeat_each_id'
             index_counter += repeat_each_id

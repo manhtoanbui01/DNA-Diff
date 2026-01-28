@@ -21,6 +21,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+sys.path.append("/data4/toan/projects/DiVE/Data_Generation")
+from lora_ipadapter import ImageProjModel, LoRAIPAdapterAttnProcessor
+from safetensors.torch import load_file
+from diffusers.models.attention_processor import LoRAAttnProcessor
 os.environ["http_proxy"]="http://localhost:8890"
 os.environ["https_proxy"]="http://localhost:8890"
 os.environ["WANDB_DISABLED"] = "true"
@@ -192,7 +196,7 @@ class DreamboothLoraGeneration(GenerativeMixup):
 
     pipe = None  # global sharing is a hack to avoid OOM
 
-    def __init__(self, lora_path: str, 
+    def __init__(self, checkpoint_path: str, 
                  model_path: str = "runwayml/stable-diffusion-v1-5",
                  embed_path: str = None,
                  prompt: str = "a photo of a {name}",
@@ -222,13 +226,74 @@ class DreamboothLoraGeneration(GenerativeMixup):
             scheduler = DPMSolverMultistepScheduler.from_config(DreamboothLoraGeneration.pipe.scheduler.config, local_files_only=True)
             self.placeholder2name = None
             self.name2placeholder = None
-            # if embed_path is not None:
-            #     self.name2placeholder, self.placeholder2name = load_diffmix_embeddings(embed_path, DreamboothLoraGeneration.pipe.text_encoder, DreamboothLoraGeneration.pipe.tokenizer)
-            if lora_path is not None:
-                DreamboothLoraGeneration.pipe.load_lora_weights(lora_path)
+            embed_path = os.path.join(os.path.dirname(os.path.normpath(checkpoint_path)), f'learned_embeds-steps-{os.path.basename(os.path.normpath(checkpoint_path))[11:]}.bin')
+            if embed_path is not None:
+                self.name2placeholder, self.placeholder2name = load_diffmix_embeddings(embed_path, DreamboothLoraGeneration.pipe.text_encoder, DreamboothLoraGeneration.pipe.tokenizer)
+            
+            unet = DreamboothLoraGeneration.pipe.unet
+            lora_ipadapter_attn_procs = {}
+            for name in unet.attn_processors.keys():
+                cross_attention_dim = None if name.endswith("attn1.processor") else unet.config.cross_attention_dim
+                if name.startswith("mid_block"):
+                    hidden_size = unet.config.block_out_channels[-1]
+                elif name.startswith("up_blocks"):
+                    block_id = int(name[len("up_blocks.")])
+                    hidden_size = list(reversed(unet.config.block_out_channels))[block_id]
+                elif name.startswith("down_blocks"):
+                    block_id = int(name[len("down_blocks.")])
+                    hidden_size = unet.config.block_out_channels[block_id]
+
+                if cross_attention_dim:
+                    lora_ipadapter_attn_procs[name] = LoRAIPAdapterAttnProcessor(
+                        hidden_size=hidden_size,
+                        cross_attention_dim=cross_attention_dim,
+                        lora_rank=128,
+                    ).to(device)
+                else:
+                    lora_ipadapter_attn_procs[name] = LoRAAttnProcessor(
+                        hidden_size=hidden_size,
+                        cross_attention_dim=cross_attention_dim,
+                        rank=128,
+                    ).to(device)
+            unet.set_attn_processor(lora_ipadapter_attn_procs)
+            # load lora and lora_ipadapter weights
+            lora_ipadapter_state = load_file(os.path.join(checkpoint_path, 'model.safetensors'))
+            missing_keys = []
+            unexpected_keys = []
+            for name, proc in unet.attn_processors.items():
+                proc_state = {
+                    k.replace(f"{name}.", ""): v
+                    for k, v in lora_ipadapter_state.items()
+                    if k.startswith(name)
+                }
+
+                if len(proc_state) == 0:
+                    continue
+
+                m, u = proc.load_state_dict(proc_state, strict=False)
+                missing_keys.extend([f"{name}.{k}" for k in m])
+                unexpected_keys.extend([f"{name}.{k}" for k in u])
+
+            print("Missing keys:", missing_keys[:10])
+            print("Unexpected keys:", unexpected_keys[:10])
+            
+            self.image_proj_model = ImageProjModel(
+                cross_attention_dim=unet.config.cross_attention_dim,
+                ip_embeddings_dim=512,
+                ip_extra_context_tokens=4,
+            )
+            image_proj_state = load_file(os.path.join(checkpoint_path, 'model_1.safetensors'))
+            missing, unexpected = self.image_proj_model.load_state_dict(
+                image_proj_state,
+                strict=True
+            )
+            self.image_proj_model.to(next(self.pipe.unet.parameters()).device)
+            print("Missing keys:", missing)
+            print("Unexpected keys:", unexpected)
+            
             DreamboothLoraGeneration.pipe.scheduler = scheduler
  
-            print(f"successfuly load lora weights from {lora_path}! ! ! ")
+            print(f"successfuly load lora ipadapter weights from {checkpoint_path}! ! ! ")
 
             logging.disable_progress_bar()
             self.pipe.set_progress_bar_config(disable=True)
@@ -269,9 +334,18 @@ class DreamboothLoraGeneration(GenerativeMixup):
         # Single prompt string
         prompt_str = self.prompt.format(name=name, description=desc)
         print("Using prompt:", prompt_str)
+        
+        device = next(self.pipe.unet.parameters()).device
+        cond_embed = metadata.get("cond_embed", "").to(device)
+        ipadapter_embed = self.image_proj_model(cond_embed)
+        if num_images_per_prompt > 1:
+            ipadapter_embed = ipadapter_embed.repeat_interleave(
+                num_images_per_prompt, dim=0
+            )
 
         # Base kwargs
         kwargs = dict(
+            ipadapter_embed=ipadapter_embed,
             guidance_scale=self.guidance_scale,
             num_inference_steps=50,
             height=resolution,
@@ -307,70 +381,16 @@ class DreamboothLoraGeneration(GenerativeMixup):
 
         has_nsfw_concept = True
         outputs = None
-        while has_nsfw_concept:
-            with autocast("cuda"):
-                outputs = self.pipe(**kwargs)
-            has_nsfw_concept = (
-                self.pipe.safety_checker is not None
-                and outputs.nsfw_content_detected[0]
-            )
+        with torch.no_grad():
+            while has_nsfw_concept:
+                with autocast("cuda"):
+                    outputs = self.pipe(**kwargs)
+                has_nsfw_concept = (
+                    self.pipe.safety_checker is not None
+                    and outputs.nsfw_content_detected[0]
+                )
 
         return outputs.images
-
-    # def forward(
-    #     self,
-    #     metadata: dict,
-    #     strength: float = 0.5,
-    #     resolution: int = 512,
-    #     num_images_per_prompt: int = 1  # <--- new
-    # ) -> List[Image.Image]:
-    #     """
-    #     Generate images purely from text prompts (metadata), ignoring any input images or labels.
-    #     Return a list of output images.
-    #     """
-        # # import pdb; pdb.set_trace()
-
-        # # "name" or your custom placeholder
-        # name = metadata.get("class_id", "")  
-        # if self.name2placeholder is not None:
-        #     name = self.name2placeholder.get(name, name)  
-
-        # #append super_class
-        # name += " " + "person"
-
-        # # "description" might also be appended or used
-        # desc = metadata.get("description", "")
-        # # e.g.: prompt = f"{desc}, a photo of {name}" or whatever format you like
-        # prompt = self.prompt.format(name=name, description=desc)
-        # print("Using prompt:", prompt)
- 
-        # kwargs = dict(
-        #     prompt=[prompt],
-        #     guidance_scale=self.guidance_scale,
-        #     num_inference_steps=50,
-        #     num_images_per_prompt=num_images_per_prompt,
-        #     height=resolution,
-        #     width=resolution // 2,
-        # )
-
-        # # If you still want to support "mask" logic, keep it, else remove
-        # # e.g.:
-        # if self.mask:
-        #     raise NotImplementedError("Mask logic is disabled in pure text-to-image mode.")
-
-        # has_nsfw_concept = True
-        # outputs = None
-        # while has_nsfw_concept:
-        #     with autocast("cuda"):
-        #         outputs = self.pipe(**kwargs)
-        #     # Bypass safety checker if needed
-        #     has_nsfw_concept = (
-        #         self.pipe.safety_checker is not None
-        #         and outputs.nsfw_content_detected[0]
-        #     )
-
-        # # Return a list of PIL images
-        # return outputs.images  # type: ignore
 
 
 if __name__ == '__main__':

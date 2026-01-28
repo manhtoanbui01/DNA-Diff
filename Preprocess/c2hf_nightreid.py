@@ -5,8 +5,23 @@ import string
 import json
 from PIL import Image
 import datasets
-from datasets import Dataset, Features, Image as ImageFeature
+from datasets import Dataset, Features, Sequence, Image as ImageFeature
+import torch
+import torch.nn.functional as F
+import kornia
 
+import sys
+sys.path.append("/data4/toan/projects/DiVE/Data_Generation/")
+
+
+from deep_person_reid.torchreid.utils import FeatureExtractor
+
+
+extractor = FeatureExtractor(
+    model_name='osnet_ain_x1_0',
+    model_path='/data4/toan/projects/DiVE/Data_Generation/deep_person_reid/osnet_ain_ms_d_m.pth.tar',
+    device='cuda:0'
+)
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -46,7 +61,29 @@ def generate_unique_descriptions(count):
         
     return codes
 
+def id_to_embed(data_path, embed_method="mean") -> dict:
+    id2paths = {}
+    cams = [cam for cam in os.listdir(data_path) if cam[:3]=="cam"]
+    for cam in cams:
+        for identity in os.listdir(os.path.join(data_path, cam)):
+            if identity not in id2paths:
+                id2paths[identity] = []
+            for image in os.listdir(os.path.join(data_path, cam, identity)):
+                id2paths[identity].append(os.path.join(data_path, cam, identity, image))
     
+    id2embed = {}
+    for identity in id2paths:
+        features = extractor(id2paths[identity])
+        if embed_method == "mean":
+            id_embed = features.mean(dim=0)
+        elif embed_method == "max":
+            id_embed = torch.max(features, dim=0).values
+        id2embed[identity] = F.normalize(id_embed, dim=0)
+    
+    return id2embed
+
+            
+     
     
 
 def main():
@@ -64,7 +101,8 @@ def main():
     id_to_label = {id_str: i for i, id_str in enumerate(all_ids)}
     
     # Prepare data
-    data = {"image": [], "label": [], "description": [], "camera": []}
+    data = {"image": [], "label": [], "cond_embed": [], "description": [], "camera": []}
+    id2embed = id_to_embed(base_path)
     
     # Generate per-camera code descriptions
     camera_descriptions = generate_unique_descriptions(num_cameras) 
@@ -99,6 +137,7 @@ def main():
                             if height >= 2 * width:
                                 data["image"].append(img.convert("RGB"))
                                 data["label"].append(id_to_label[id_str])  # label is the id but start from 1
+                                data["cond_embed"].append(id2embed[formatted_id])
                                 data["description"].append(description)
                                 data["camera"].append(camera_name)
                             else:
@@ -119,6 +158,7 @@ def main():
             {
                 "image": ImageFeature(),
                 "label": datasets.ClassLabel(names=all_ids),
+                "cond_embed": datasets.Sequence(datasets.Value("float32")),
                 "description": datasets.Value("string"),
                 "camera": datasets.Value("string"),
             }

@@ -3,11 +3,11 @@
 
 function sample {
     # Default arguments if not provided
-    data_dir=${1:-"/root/autodl-tmp/DiVE/synthesize_data/preprocess/step1/2/sysu/sysu"}
-    model_path=${2:-"/root/autodl-tmp/autodl-tmp/models--runwayml--stable-diffusion-v1-5/snapshots/1d0c4ebf6ff58a5caecab40fa1406526bca4b5b9"}
+    data_dir=${1:-"/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_with_ipadapter/"}
+    model_path=${2:-"/data4/toan/projects/DiVE/stable-diffusion-v1-5"}
     lora_path=${3:-"finetune_model/lora_ti/pytorch_lora_weights.safetensors"}
     embed_path=${4:-"finetune_model/lora_ti/learned_embeds-steps-last.bin"}
-    output_dir=${5:-"outputs"}
+    output_dir=${5:-"/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_with_ipadapter/outputs"}
     resolution=${6:-512}
     
     echo "Starting image generation with:"

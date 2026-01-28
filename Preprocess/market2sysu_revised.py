@@ -12,13 +12,13 @@ def main():
     parser.add_argument(
         "--market_gt_bbox_dir",
         type=str,
-        default="/root/autodl-tmp/DiVE/synthesize_data/preprocess/step1/2/market_data/Market-1501-v15.09.15/gt_bbox",
+        default="/data4/toan/projects/DiVE/dataset/Market-1501-v15.09.15/gt_bbox_real",
         help="Path of the gt_bbox folder in the Market-1501 dataset"
     )
     parser.add_argument(
         "--sysu_dir",
         type=str,
-        default="sysu_filtered",
+        default="/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_with_ipadapter/",
         help="Root directory path of the SYSU-MM01 dataset"
     )
     parser.add_argument(
