@@ -156,14 +156,16 @@ def build_queue_via_metadata(
 
     # Sort class IDs so you process them in ascending order
     all_class_ids = class2label.keys()
+    # print("Class to label: ", class2label)
     # print("All class ids: ", all_class_ids)
     
     cond_market1501_path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501/cam7/"
     label2embed = {}
     for identity in os.listdir(cond_market1501_path):
+        label = class2label[str(int(identity))]
         possible_cond_image_paths = [os.path.join(cond_market1501_path, identity, image) for image in os.listdir(os.path.join(cond_market1501_path, identity))]
         possible_cond_embeds = osnet(possible_cond_image_paths)
-        label2embed[identity] = possible_cond_embeds
+        label2embed[label] = possible_cond_embeds
 
     for cam_name in cameras:
         if cam_name not in camera_to_description:
@@ -176,9 +178,10 @@ def build_queue_via_metadata(
         for class_id in all_class_ids:
             if int(class_id) <= threshold:
                 continue
-            if class_id not in label2embed:
-                continue
-            embeds = label2embed[f"{int(class_id):04d}"]
+            # if class_id not in label2embed:
+            #     continue
+            label = class2label[class_id]
+            embeds = label2embed[label]
             
 
             start_i = index_counter

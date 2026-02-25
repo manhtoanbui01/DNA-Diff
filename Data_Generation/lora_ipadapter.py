@@ -67,7 +67,7 @@ class LoRAIPAdapterAttnProcessor(torch.nn.Module):
             the weight scale of image prompt.
     """
 
-    def __init__(self, hidden_size, cross_attention_dim=None, num_tokens=(4,), lora_rank: int=4, lora_alpha: float=1.0, scale=1.0):
+    def __init__(self, hidden_size, cross_attention_dim=None, num_tokens=(4,), lora_rank: int=4, lora_alpha: float=1.0, scale=0.0):
         super().__init__()
 
         if not hasattr(F, "scaled_dot_product_attention"):

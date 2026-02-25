@@ -74,7 +74,7 @@ def main():
     # camera_to_description = {f'cam{i}': desc for i, desc in enumerate(camera_descriptions, 1)}
     # description_to_camera = {desc: f"cam{i}" for i, desc in enumerate(camera_descriptions, 1)}
     
-    camera_to_description = {"cam1": "YsFy", "cam2": "kH3A", "cam3": "MaEe", "cam4": "5VZX", "cam5": "78nx", "cam6": "wuGU", "cam7": "J6bh"}
+    camera_to_description = {"cam1": "x46E", "cam2": "el7d", "cam3": "Bwh2", "cam4": "SOHz", "cam5": "DApu", "cam6": "3iLj", "cam7": "9TaR"}
     print(f'Camera to description {camera_to_description}')
     description_to_camera = {desc: cam for cam, desc in camera_to_description.items()}
     
@@ -114,7 +114,7 @@ def main():
                         width, height = img.size
                         if height >= 2 * width:                        
                             data["image"].append(img.convert("RGB"))
-                            data["label"].append(identity)
+                            data["label"].append(int(identity)-1)
                             data["cond_image"].append(possible_cond_image_paths)
                             data["description"].append(description)
                             data["camera"].append(camera_name)
