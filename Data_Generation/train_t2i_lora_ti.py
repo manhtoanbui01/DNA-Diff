@@ -49,6 +49,7 @@ from diffusers.utils.import_utils import is_xformers_available
 
 from typing import Any, Tuple, Dict
 from lora_ipadapter import LoRAIPAdapterAttnProcessor, ImageProjModel
+import kornia
 
 # os.environ["http_proxy"]="http://localhost:8890"
 # os.environ["https_proxy"]="http://localhost:8890"
@@ -350,19 +351,54 @@ def parse_args():
 
     return args
 
+def preprocess(x):
+    dtype = x.dtype
+    x = kornia.geometry.resize(x.to(torch.float32), (256, 128), interpolation='bicubic', align_corners=True, antialias=False).to(dtype=dtype)   # not bf16
+    x = (x + 1.) / 2.  # [-1,1] -> [0,1]
+    x = x.clamp(0, 1)
+    x = kornia.enhance.normalize(x, torch.Tensor([0.485, 0.456, 0.406]),
+                                 torch.Tensor([0.229, 0.224, 0.225]))
+    return x
 
-def save_progress(text_encoder, placeholder_token_ids, accelerator, args, name2placeholder, placeholder2name, save_path):
-    logger.info("Saving embeddings")
-    learned_embeds = (
-        accelerator.unwrap_model(text_encoder)
-        .get_input_embeddings()
-        .weight[placeholder_token_ids]
-    )
-    learned_embeds_dict = {}
-    for learned_embed, (name, placeholder) in zip(learned_embeds, name2placeholder.items()):
-        learned_embeds_dict[placeholder] = learned_embed
+def extract_features(model, image_tensor):
+    """
+    Extract osnet features from a tensor.
+
+    Args:
+        model: osnet model
+        image_tensor: torch.Tensor of shape [B, 3, H, W] or [3, H, W] in range [-1,1]
+        transform: optional torchvision transform to preprocess image_tensor
+
+    Returns:
+        features: torch.Tensor of shape [B, D]
+    """
+
+    image_tensor = preprocess(image_tensor)
+
+    # Ensure batch dimension
+    if image_tensor.dim() == 3:
+        image_tensor = image_tensor.unsqueeze(0)  # [1, 3, H, W]
+
+    image_tensor = image_tensor.cuda()
+    # image_tensor = image_tensor.to(dtype=next(model.parameters()).dtype)
+
+    features = model(image_tensor)  # [B, D]
+
+    return features
+
+
+# def save_progress(text_encoder, placeholder_token_ids, accelerator, args, name2placeholder, placeholder2name, save_path):
+#     logger.info("Saving embeddings")
+#     learned_embeds = (
+#         accelerator.unwrap_model(text_encoder)
+#         .get_input_embeddings()
+#         .weight[placeholder_token_ids]
+#     )
+#     learned_embeds_dict = {}
+#     for learned_embed, (name, placeholder) in zip(learned_embeds, name2placeholder.items()):
+#         learned_embeds_dict[placeholder] = learned_embed
     
-    torch.save(dict(learned_embeds_dict = learned_embeds_dict, name2placeholder=name2placeholder, placeholder2name=placeholder2name), save_path)
+#     torch.save(dict(learned_embeds_dict = learned_embeds_dict, name2placeholder=name2placeholder, placeholder2name=placeholder2name), save_path)
 
 
 
@@ -425,13 +461,13 @@ def main():
     unet.requires_grad_(False)
     vae.requires_grad_(False)
     from deep_person_reid.torchreid.utils import FeatureExtractor
-    # osnet = FeatureExtractor(
-    #     model_name='osnet_ain_x1_0',
-    #     model_path='deep_person_reid/osnet_ain_ms_d_m.pth.tar',
-    #     # device='cuda:0'
-    # )
-    # osnet.model.eval()
-    # osnet.model.requires_grad_(False)
+    osnet = FeatureExtractor(
+        model_name='osnet_ain_x1_0',
+        model_path='deep_person_reid/osnet_ain_ms_d_m.pth.tar',
+        # device='cuda:0'
+    )
+    osnet.model.eval()
+    osnet.model.requires_grad_(False)
     
     image_proj_model = ImageProjModel(
         cross_attention_dim=unet.config.cross_attention_dim,
@@ -441,7 +477,6 @@ def main():
     image_proj_model.train()
     image_proj_model.requires_grad_(True)
 
-    # text_encoder.requires_grad_(False)
 
     # For mixed precision training we cast all non-trainable weigths (vae, non-lora text_encoder and non-lora unet) to half-precision
     # as these weights are only used for inference, keeping weights in full precision is not required.
@@ -454,7 +489,7 @@ def main():
     # Move unet, vae and text_encoder to device and cast to weight_dtype
     unet.to(accelerator.device, dtype=weight_dtype)
     vae.to(accelerator.device, dtype=weight_dtype)
-    # osnet = osnet.model.to(accelerator.device)
+    osnet = osnet.model.to(accelerator.device)
     image_proj_model.to(accelerator.device)
     text_encoder.to(accelerator.device, dtype=weight_dtype)
     text_encoder.text_model.embeddings.token_embedding.weight.data = text_encoder.get_input_embeddings().weight.data.float()
@@ -486,9 +521,9 @@ def main():
         )
     
     # Resize the token embeddings as we are adding new special tokens to the tokenizer
-    text_encoder.resize_token_embeddings(len(tokenizer)) #增加embedding的长度，[49408, 768]->[50814, 768]
 
     # Initialise the newly added placeholder token with the embeddings of the initializer token
+    text_encoder.resize_token_embeddings(len(tokenizer)) # [49408, 768]->[50814, 768]
     token_embeds = text_encoder.get_input_embeddings().weight.data #[50814, 768]
     initializer_token_id = INITIALIZER_TOKEN #42170
     placeholder_token_ids = tokenizer.convert_tokens_to_ids(placeholder_tokens) #49408, 49409, 49410, 49411, 49412 ... 496607 #正常的embedding到49407结束
@@ -496,10 +531,21 @@ def main():
         for token_id in placeholder_token_ids:
             token_embeds[token_id] = token_embeds[initializer_token_id].clone() #把newly added token 赋予INITIALIZER_TOKEN对应的embedding的值
             
-    index_no_updates = torch.ones((len(tokenizer),), dtype=torch.bool) #[49608]
-    index_no_updates[placeholder_token_ids] = False #index_no_updates用来区分可学习的embedding和不可学习的embedding
+    # index_no_updates = torch.ones((len(tokenizer),), dtype=torch.bool) #[49608] # no update tokens
 
+    text_encoder_weight_path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501/finetune_model/lora_ti/learned_embeds-steps-25000.bin"
+    learned_embeds = torch.load(text_encoder_weight_path, map_location="cpu")["learned_embeds_dict"]
 
+    with torch.no_grad():
+        for token, embed in learned_embeds.items():
+            token_id = tokenizer.convert_tokens_to_ids(token)
+            print(f"Loaded weight for token id {token_id}")
+            token_embeds[token_id] = embed
+
+    # 5. Freeze entire text encoder
+    text_encoder.requires_grad_(False)
+    text_encoder.eval()
+    
 
 
     # Set correct lora layers
@@ -527,8 +573,20 @@ def main():
                 cross_attention_dim=cross_attention_dim,
                 rank=args.rank,
             )
-
+            
     unet.set_attn_processor(lora_ipadapter_attn_procs)
+    
+    # Load stage 1 LoRA weight
+    from safetensors.torch import load_file
+    ckpt_path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501/finetune_model/finetune_stage2_ipadapter/stage1_lora_weight/model.safetensors"
+    state_dict = load_file(ckpt_path)
+    missing, unexpected = unet.load_state_dict(state_dict, strict=False)
+
+    print("Missing keys:", len(missing))
+    print("Unexpected keys:", len(unexpected))
+
+    
+
 
     if args.enable_xformers_memory_efficient_attention:
         if is_xformers_available():
@@ -566,11 +624,22 @@ def main():
         # Compute SNR.
         snr = (alpha / sigma) ** 2
         return snr
-#endregion Unet_lora
 
-#region Dataloader and Optimizer and Scheculer
 
+
+    # Freeze LoRA, only finetune IPAdapter
+    for module in unet.attn_processors.values():
+        for name, param in module.named_parameters():
+            if "lora" in name:
+                param.requires_grad = False
+    
     lora_layers = AttnProcsLayers(unet.attn_processors)
+    
+    # Verify
+    for name, p in lora_layers.named_parameters():
+        if p.requires_grad:
+            print("REQUIRED GRAD LAYERS:", name)
+
 
     # Enable TF32 for faster training on Ampere GPUs,
     # cf https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices
@@ -597,22 +666,12 @@ def main():
 
     optimizer = optimizer_cls(
         [{'params': lora_layers.parameters(), 'lr': args.learning_rate if not args.ti_only else 0},
-         {'params': image_proj_model.parameters(), 'lr': args.learning_rate},
-         {'params': text_encoder.get_input_embeddings().parameters(), 'lr': args.ti_learning_rate}], # 这样做的一个好处是可以用accelerate的pipe统一管理checkpoint
+         {'params': image_proj_model.parameters(), 'lr': args.learning_rate},],
         betas=(args.adam_beta1, args.adam_beta2),
         weight_decay=args.adam_weight_decay,
         eps=args.adam_epsilon,
     )
 
-    # Get the datasets: you can either provide your own training and evaluation files (see below)
-    # or specify a Dataset from the hub (the dataset will be downloaded automatically from the datasets Hub).
-
-    # In distributed training, the load_dataset function guarantees that only one local process can concurrently
-    # download the dataset.
-    
-    # 6. Get the column names for input/target.
-     # Preprocessing the datasets.
-    # We need to tokenize input captions and transform the images.
     def tokenize_captions(examples, is_train=True):
         captions = []
         # import pdb;pdb.set_trace()
@@ -637,10 +696,11 @@ def main():
         # import pdb;pdb.set_trace()
         pixel_values = torch.stack([example["pixel_values"] for example in examples])
         pixel_values = pixel_values.to(memory_format=torch.contiguous_format).float()
-        cond_embeds = torch.stack([example["cond_embed"] for example in examples])
+        cond_pixel_values = torch.stack([example["cond_pixel_values"] for example in examples])
+        cond_pixel_values = cond_pixel_values.to(memory_format=torch.contiguous_format).float()
         input_ids = tokenize_captions(examples) #'a jCmLmYM5 photo of a <class_599> person'
         # input_ids = torch.stack([example["input_ids"] for example in input_ids])
-        return {"pixel_values": pixel_values, "cond_embeds": cond_embeds, "input_ids": input_ids}
+        return {"pixel_values": pixel_values, "cond_pixel_values": cond_pixel_values, "input_ids": input_ids}
 
     # DataLoaders creation:
     train_dataloader = torch.utils.data.DataLoader(
@@ -729,11 +789,11 @@ def main():
 #endregion
 
     # keep original embeddings as reference
-    orig_embeds_params = accelerator.unwrap_model(text_encoder).get_input_embeddings().weight.data.clone()
+    # orig_embeds_params = accelerator.unwrap_model(text_encoder).get_input_embeddings().weight.data.clone()
     # import pdb;pdb.set_trace()
     for epoch in range(first_epoch, args.num_train_epochs):
         unet.train()
-        text_encoder.train()
+        # text_encoder.train()
         train_loss = 0.0
         for step, batch in enumerate(train_dataloader):
             # Skip steps until we reach the resumed step
@@ -742,7 +802,7 @@ def main():
                     progress_bar.update(1)
                 continue
             # import pdb;pdb.set_trace()
-            with accelerator.accumulate(unet, text_encoder):
+            with accelerator.accumulate(unet, image_proj_model):
                 # Convert images to latent space
                 latents = vae.encode(batch["pixel_values"].to(dtype=weight_dtype)).latent_dist.sample()
                 latents = latents * vae.config.scaling_factor
@@ -766,7 +826,7 @@ def main():
                 # import pdb;pdb.set_trace()
                 # Get the text embedding for conditioning
                 encoder_hidden_states = text_encoder(batch["input_ids"])[0].to(dtype=weight_dtype) #[16, 77, 768] batch["input_ids"] [16, 77]
-                osnet_embeds = batch["cond_embeds"]
+                osnet_embeds = extract_features(osnet, batch["cond_pixel_values"])
                 ipadapter_embeds = image_proj_model(osnet_embeds)
                 encoder_hidden_states = (encoder_hidden_states, ipadapter_embeds)
                 # Get the target for loss depending on the prediction type
@@ -816,10 +876,10 @@ def main():
 
                 # Let's make sure we don't update any embedding weights besides the newly added token
 
-                with torch.no_grad():
-                    accelerator.unwrap_model(text_encoder).get_input_embeddings().weight[
-                        index_no_updates
-                    ] = orig_embeds_params[index_no_updates]
+                # with torch.no_grad():
+                #     accelerator.unwrap_model(text_encoder).get_input_embeddings().weight[
+                #         index_no_updates
+                #     ] = orig_embeds_params[index_no_updates]
 
             # Checks if the accelerator has performed an optimization step behind the scenes
             if accelerator.sync_gradients:
@@ -850,19 +910,19 @@ def main():
                                     removing_checkpoint = os.path.join(args.output_dir, removing_checkpoint)
                                     shutil.rmtree(removing_checkpoint)
 
-                        weight_name = (
-                            f"learned_embeds-steps-{global_step}.bin"
-                        )
+                        # weight_name = (
+                        #     f"learned_embeds-steps-{global_step}.bin"
+                        # )
                         
-                        save_progress(
-                            text_encoder,
-                            placeholder_token_ids,
-                            accelerator,
-                            args,
-                            name2placeholder=name2placeholder,
-                            placeholder2name=placeholder2name,      
-                            save_path = os.path.join(args.output_dir, weight_name),
-                        )
+                        # save_progress(
+                        #     text_encoder,
+                        #     placeholder_token_ids,
+                        #     accelerator,
+                        #     args,
+                        #     name2placeholder=name2placeholder,
+                        #     placeholder2name=placeholder2name,      
+                        #     save_path = os.path.join(args.output_dir, weight_name),
+                        # )
                         save_path = os.path.join(args.output_dir, f"checkpoint-{global_step}")
                         accelerator.save_state(save_path)
                         logger.info(f"Saved state to {save_path}")
@@ -878,23 +938,23 @@ def main():
     if accelerator.is_main_process:
         unet = unet.to(torch.float32)
         unet.save_attn_procs(args.output_dir)
-        weight_name = (
-            f"learned_embeds-steps-last.bin"
-        )
+        # weight_name = (
+        #     f"learned_embeds-steps-last.bin"
+        # )
         image_proj_model_to_save = accelerator.unwrap_model(image_proj_model)
         torch.save(
             image_proj_model_to_save.state_dict(),
             os.path.join(args.output_dir, "image_proj_model.bin")
         )
-        save_progress(
-            text_encoder,
-            placeholder_token_ids,
-            accelerator,
-            args,
-            name2placeholder=name2placeholder,
-            placeholder2name=placeholder2name,
-            save_path = os.path.join(args.output_dir, weight_name),
-        )
+        # save_progress(
+        #     text_encoder,
+        #     placeholder_token_ids,
+        #     accelerator,
+        #     args,
+        #     name2placeholder=name2placeholder,
+        #     placeholder2name=placeholder2name,
+        #     save_path = os.path.join(args.output_dir, weight_name),
+        # )
 
     accelerator.end_training()
     print("All processes finished.")

@@ -1,12 +1,28 @@
-from datasets import load_from_disk
+# from safetensors.torch import load_file
+
+# weight_path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501/finetune_model/lora_ti/checkpoint-10000/model_1.safetensors"
+
+# state_dict = load_file(weight_path)
+
+# print("Number of keys:", len(state_dict))
+
+# for key in state_dict.keys():
+#     print(key)
+
+
 import torch
 
-dataset = load_from_disk("/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_with_ipadapter/")
+path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501/finetune_model/lora_ti/learned_embeds-steps-25000.bin"
 
-print(dataset)
-print(len(dataset))
-data = dataset[0:100]
-print(data['label'])
+data = torch.load(path, map_location="cpu")["name2placeholder"]
 
-lists = dataset['cond_embed']
-print(torch.equal(torch.Tensor(lists[0]), torch.Tensor(lists[10])))
+print("Type:", type(data))
+
+if isinstance(data, dict):
+    print("Number of keys:", len(data))
+    print("Keys:")
+    for i, (k,v) in enumerate(data.items()):
+        # print(k)
+        print(f'{k}:{v}')
+        if i == 10:
+            break

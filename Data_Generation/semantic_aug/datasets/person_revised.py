@@ -28,6 +28,7 @@ if HUG_LOCAL_IMAGE_TRAIN_DIR is None:
     raise ValueError("HUG_LOCAL_IMAGE_TRAIN_DIR env variable is not set.")
 
 
+
 def onehot(size, target):
     vec = torch.zeros(size, dtype=torch.float32)
     vec[target] = 1.
@@ -199,7 +200,7 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
                  seed: int = 0, 
                  image_train_dir: str = HUG_LOCAL_IMAGE_TRAIN_DIR, 
                  max_train_samples: int = -1,
-                 class_prompts_ratio: float = 0.5,
+                 class_prompts_ratio: float = 1.0, # finetuning stage 2, always use the full image caption
                  resolution: Tuple[int, int] = (512, 256),#int = 512,
                  center_crop: bool = False,
                  random_flip: bool = False,
@@ -286,13 +287,17 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
         # import pdb;pdb.set_trace()
         image = self.get_image_by_idx(idx)
         prompt = self.get_prompt_by_idx(idx)
-        cond_embed = self.get_cond_embed_by_idx(idx)
+        cond_image = self.get_cond_image_by_idx(idx)
         # label = self.get_label_by_idx(idx)
 
-        return dict(pixel_values=self.transform(image), cond_embed=cond_embed, caption = prompt)
+        return dict(pixel_values=self.transform(image), cond_pixel_values=self.transform(cond_image), caption = prompt)
 
-    def get_cond_embed_by_idx(self, idx: int) -> list:
-        return torch.tensor(self.dataset[idx]['cond_embed'])
+    def get_cond_image_by_idx(self, idx: int) -> list:
+        cond_images = self.dataset[idx]["cond_image"]
+        cond_image_path = random.choice(cond_images)
+        with Image.open(cond_image_path) as img:
+        
+            return img.convert("RGB")
     
     def get_image_by_idx(self, idx: int) -> Image.Image:
 
@@ -320,13 +325,13 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
         # (B) Access the textual description from the dataset
         domain_description = self.dataset[idx]['description'].strip()
         
+        path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501/finetune_model/lora_ti/learned_embeds-steps-25000.bin"
+        self.name2placeholder = torch.load(path, map_location="cpu")["name2placeholder"]
+        self.placeholder2name = torch.load(path, map_location="cpu")["placeholder2name"]
         if flag:
             # import pdb;pdb.set_trace()
             # (C) Optionally get the placeholder name vs. direct class label
-            if self.use_placeholder and self.name2placeholder is not None:
-                content = self.name2placeholder[self.label2class[self.dataset[idx]['label']]]
-            else:
-                content = self.label2class[self.dataset[idx]['label']]
+            content = self.name2placeholder[self.label2class[self.dataset[idx]['label']]]
 
             # Append the "super_class_name" if you want, e.g. "person"
             content += " person"
@@ -346,45 +351,6 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
 
         return prompt
 
-    # def get_prompt_by_idx(self, idx: int) -> int:
-        
-    #     # import pdb;pdb.set_trace()
-    #     # randomly choose from class name or description
-    #     flag = random.random() < 1 #self.class_prompts_ratio 
-    #     if flag:
-    #         if self.use_placeholder:
-    #             content = self.name2placeholder[self.label2class[self.dataset[idx]['label']]] + f' {self.super_class_name}'
-    #                     # Add the description to the content
-    #             # content += f" in {self.dataset[idx]['description']}"
-    #         else:
-    #             content = self.label2class[self.dataset[idx]['label']] + f' {self.super_class_name}'
-    #         # prompt =  random.choice(IMAGENET_TEMPLATES_SMALL).format(content)
-
-    #         # Get the domain description
-    #         domain_description = self.dataset[idx]['description']
-            
-    #         # Choose a template
-    #         template = random.choice(IMAGENET_TEMPLATES_DIVE)
-            
-    #         # Find the position of the first space
-    #         first_space_pos = template.find(' ')
-            
-    #         # Insert the domain description after the first word
-    #         if first_space_pos != -1:
-    #             # Split the template into the first word and the rest
-    #             first_word = template[:first_space_pos]
-    #             rest_of_template = template[first_space_pos:].lstrip()  # Remove leading spaces from the rest
-    #             modified_template = f"{first_word} {domain_description} {rest_of_template}"
-    #         else:
-    #             # If there's no space in the template, just append the description
-    #             modified_template = f"{template} {domain_description}"
-
-    #         # Format the template with the content
-    #         prompt = modified_template.format(content)
-            
-    #     else:
-    #         prompt = random.choice(self.dataset[idx]['description'].strip().split('\n'))
-    #     return prompt
 
     def get_metadata_by_idx(self, idx: int) -> dict:
         return dict(name=self.label2class[self.get_label_by_idx(idx)])

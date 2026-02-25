@@ -5,23 +5,7 @@ import string
 import json
 from PIL import Image
 import datasets
-from datasets import Dataset, Features, Sequence, Image as ImageFeature
-import torch
-import torch.nn.functional as F
-import kornia
-
-import sys
-sys.path.append("/data4/toan/projects/DiVE/Data_Generation/")
-
-
-from deep_person_reid.torchreid.utils import FeatureExtractor
-
-
-extractor = FeatureExtractor(
-    model_name='osnet_ain_x1_0',
-    model_path='/data4/toan/projects/DiVE/Data_Generation/deep_person_reid/osnet_ain_ms_d_m.pth.tar',
-    device='cuda:0'
-)
+from datasets import Dataset, Features, Image as ImageFeature, Sequence
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -37,53 +21,31 @@ def read_ids(file_path):
     with open(file_path, 'r') as f:
         return f.read().strip().split(',')
     
-def generate_unique_descriptions(count):
-    """
-    Generate 'count' random codes of length 4 with no character overlap among them.
-    If count > 15, it will raise a ValueError, because we only have 62 distinct
-    alphanumeric characters in total.
-    """
-    all_chars = list(string.ascii_letters + string.digits)  # 62 unique chars
-    random.shuffle(all_chars)
+# def generate_unique_descriptions(count):
+#     """
+#     Generate 'count' random codes of length 4 with no character overlap among them.
+#     If count > 15, it will raise a ValueError, because we only have 62 distinct
+#     alphanumeric characters in total.
+#     """
+#     all_chars = list(string.ascii_letters + string.digits)  # 62 unique chars
+#     random.shuffle(all_chars)
     
-    max_codes = len(all_chars) // 4
-    if count > max_codes:
-        raise ValueError(
-            f"Cannot generate {count} completely different codes of length 4. "
-            f"Maximum possible is {max_codes}."
-        )
-    codes = []
-    start = 0
-    for _ in range(count):
-        chunk = all_chars[start:start+4]
-        codes.append("".join(chunk))
-        start += 4
+#     max_codes = len(all_chars) // 4
+#     if count > max_codes:
+#         raise ValueError(
+#             f"Cannot generate {count} completely different codes of length 4. "
+#             f"Maximum possible is {max_codes}."
+#         )
+#     codes = []
+#     start = 0
+#     for _ in range(count):
+#         chunk = all_chars[start:start+4]
+#         codes.append("".join(chunk))
+#         start += 4
         
-    return codes
+#     return codes
 
-def id_to_embed(data_path, embed_method="mean") -> dict:
-    id2paths = {}
-    cams = [cam for cam in os.listdir(data_path) if cam[:3]=="cam"]
-    for cam in cams:
-        for identity in os.listdir(os.path.join(data_path, cam)):
-            if identity not in id2paths:
-                id2paths[identity] = []
-            for image in os.listdir(os.path.join(data_path, cam, identity)):
-                id2paths[identity].append(os.path.join(data_path, cam, identity, image))
     
-    id2embed = {}
-    for identity in id2paths:
-        features = extractor(id2paths[identity])
-        if embed_method == "mean":
-            id_embed = features.mean(dim=0)
-        elif embed_method == "max":
-            id_embed = torch.max(features, dim=0).values
-        id2embed[identity] = F.normalize(id_embed, dim=0)
-    
-    return id2embed
-
-            
-     
     
 
 def main():
@@ -95,61 +57,104 @@ def main():
     num_cameras = args.num_cameras
     
     train_id_path = os.path.join(base_path, "exp", "train_id.txt")
-    
     all_ids = read_ids(train_id_path)
-    # Create label mapping
-    id_to_label = {id_str: i for i, id_str in enumerate(all_ids)}
+    
+
+    
+    
+    
     
     # Prepare data
-    data = {"image": [], "label": [], "cond_embed": [], "description": [], "camera": []}
-    id2embed = id_to_embed(base_path)
+    data = {"image": [], 'label': [], "cond_image": [], "description": [], "camera": []}
     
     # Generate per-camera code descriptions
-    camera_descriptions = generate_unique_descriptions(num_cameras) 
+    # camera_descriptions = generate_unique_descriptions(num_cameras) 
     
     # Create mappings
-    camera_to_description = {f'cam{i}': desc for i, desc in enumerate(camera_descriptions, 1)}
+    # camera_to_description = {f'cam{i}': desc for i, desc in enumerate(camera_descriptions, 1)}
+    # description_to_camera = {desc: f"cam{i}" for i, desc in enumerate(camera_descriptions, 1)}
+    
+    camera_to_description = {"cam1": "YsFy", "cam2": "kH3A", "cam3": "MaEe", "cam4": "5VZX", "cam5": "78nx", "cam6": "wuGU", "cam7": "J6bh"}
     print(f'Camera to description {camera_to_description}')
-    description_to_camera = {desc: f"cam{i}" for i, desc in enumerate(camera_descriptions, 1)}
+    description_to_camera = {desc: cam for cam, desc in camera_to_description.items()}
+    
     
     # Saving these mappings to a file
-    camera_mappings = {
-        "dataset": current_dataset,
-        "num_cameras": num_cameras,
-        "camera_to_description": camera_to_description,
-        "description_to_camera": description_to_camera
-    }
-    mapping_file = f"camera_description_mappings_{current_dataset}.json"
-    with open(mapping_file, "w") as f:
-        json.dump(camera_mappings, f)
+    # camera_mappings = {
+    #     "dataset": current_dataset,
+    #     "num_cameras": num_cameras,
+    #     "camera_to_description": camera_to_description,
+    #     "description_to_camera": description_to_camera
+    # }
+    # mapping_file = f"camera_description_mappings_{current_dataset}.json"
+    # with open(mapping_file, "w") as f:
+    #     json.dump(camera_mappings, f)
         
+
     def process_images(camera_path, camera_name):
         description = camera_to_description[camera_name]
-        for id_str in all_ids:
-            formatted_id = f"{int(id_str):04d}"
-            id_path = os.path.join(camera_path, formatted_id)
-            if os.path.exists(id_path):
-                for img_name in os.listdir(id_path):
-                    img_path = os.path.join(id_path, img_name)
-                    try:
-                        with Image.open(img_path) as img:
-                            width, height = img.size
-                            if height >= 2 * width:
-                                data["image"].append(img.convert("RGB"))
-                                data["label"].append(id_to_label[id_str])  # label is the id but start from 1
-                                data["cond_embed"].append(id2embed[formatted_id])
-                                data["description"].append(description)
-                                data["camera"].append(camera_name)
-                            else:
-                                print(f"Skipping image {img_path} due to insufficient height")
-                    except Exception as e:
-                        print(f"Error processing image {img_path}: {e}")
-    
-    # Process images by camera
+        for identity in os.listdir(camera_path):
+            identity_path = os.path.join(camera_path, identity)
+            possible_cond_image_paths = []
+            # choose all images of the same identity with different camera for condition
+            other_cam_names = [x for x in [f"cam{i+1}" for i in range(6)] if x != camera_name]
+            
+            for cond_cam_name in other_cam_names:
+                cond_cam_path = os.path.join(os.path.dirname(camera_path), cond_cam_name)
+                if identity in os.listdir(cond_cam_path):
+                    for image in os.listdir(os.path.join(cond_cam_path, identity)):
+                        possible_cond_image_paths.append(os.path.join(cond_cam_path, identity, image))
+            if len(possible_cond_image_paths) == 0:
+                print(f'Person {identity} cam {camera_name} has 0 possible condition image, skip it')
+                continue
+            for img_name in os.listdir(identity_path):
+                img_path = os.path.join(identity_path, img_name)
+                try:
+                    with Image.open(img_path) as img:
+                        width, height = img.size
+                        if height >= 2 * width:                        
+                            data["image"].append(img.convert("RGB"))
+                            data["label"].append(identity)
+                            data["cond_image"].append(possible_cond_image_paths)
+                            data["description"].append(description)
+                            data["camera"].append(camera_name)
+                        else:
+                            print(f"Skipping image {img_path} due to insufficient height")
+                except Exception as e:
+                    print(f"Error processing image {img_path}: {e}")
+                
+                
+    def process_market1501_images(camera_path, camera_name):
+        description = camera_to_description[camera_name]
+        
+        for identity in os.listdir(camera_path):
+            identity_path = os.path.join(camera_path, identity)
+            for image in os.listdir(identity_path):
+                img_path = os.path.join(identity_path, image)
+                possible_cond_image_paths = [os.path.join(identity_path, img) for img in os.listdir(identity_path) if img != image]
+                if len(possible_cond_image_paths) == 0:
+                    print(f'identity {identity} image {image}  has 0 possible condition image, skip it')
+                    continue
+                
+                with Image.open(img_path) as img:
+                    data["image"].append(img.convert("RGB"))
+                    data["label"].append(identity)
+                    data["cond_image"].append(possible_cond_image_paths)
+                    data["description"].append(description)
+                    data["camera"].append(camera_name)
+        
+            
+        
+    # Process images by environment
     camera_paths = [os.path.join(base_path, f"cam{i}") for i in range(1, num_cameras + 1)]
+    if os.path.join(base_path, "cam7") in camera_paths:
+        camera_paths = [cam for cam in camera_paths if cam != os.path.join(base_path, "cam7")]
+        process_market1501_images(camera_path=os.path.join(base_path, 'cam7'), camera_name='cam7')
+        
     for i, camera_path in enumerate(camera_paths, 1):
         camera_name = f"cam{i}"
         process_images(camera_path, camera_name)
+
     
     # Build the dataset
     dataset = Dataset.from_dict(
@@ -158,7 +163,7 @@ def main():
             {
                 "image": ImageFeature(),
                 "label": datasets.ClassLabel(names=all_ids),
-                "cond_embed": datasets.Sequence(datasets.Value("float32")),
+                "cond_image": Sequence(datasets.Value("string")),
                 "description": datasets.Value("string"),
                 "camera": datasets.Value("string"),
             }

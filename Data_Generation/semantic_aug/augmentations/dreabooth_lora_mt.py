@@ -226,9 +226,8 @@ class DreamboothLoraGeneration(GenerativeMixup):
             scheduler = DPMSolverMultistepScheduler.from_config(DreamboothLoraGeneration.pipe.scheduler.config, local_files_only=True)
             self.placeholder2name = None
             self.name2placeholder = None
-            embed_path = os.path.join(os.path.dirname(os.path.normpath(checkpoint_path)), f'learned_embeds-steps-{os.path.basename(os.path.normpath(checkpoint_path))[11:]}.bin')
-            if embed_path is not None:
-                self.name2placeholder, self.placeholder2name = load_diffmix_embeddings(embed_path, DreamboothLoraGeneration.pipe.text_encoder, DreamboothLoraGeneration.pipe.tokenizer)
+            embed_path = os.path.join(os.path.dirname(os.path.normpath(checkpoint_path)), f'learned_embeds-steps-last.bin')
+            self.name2placeholder, self.placeholder2name = load_diffmix_embeddings(embed_path, DreamboothLoraGeneration.pipe.text_encoder, DreamboothLoraGeneration.pipe.tokenizer)
             
             unet = DreamboothLoraGeneration.pipe.unet
             lora_ipadapter_attn_procs = {}
@@ -320,7 +319,7 @@ class DreamboothLoraGeneration(GenerativeMixup):
         seeds: List[int] = None  # <-- new
     ) -> List[Image.Image]:
         """
-        Generate images purely from text prompts (metadata).
+        Generate images from text prompts (metadata) and conditional image (to add more detailed).
         If 'seeds' is passed and len(seeds) == num_images_per_prompt,
         each image in the batch uses a distinct random seed.
         """

@@ -3,9 +3,9 @@
 
 function finetune {
     # Default arguments if not provided
-    data_dir=${1:-"/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_with_ipadapter/"}
+    data_dir=${1:-"/data4/toan/projects/DiVE/dataset/NightReID_Market1501/"}
     model_path=${2:-"/data4/toan/projects/DiVE/stable-diffusion-v1-5"}
-    output_dir=${3:-"/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_with_ipadapter/finetune_model/lora_ti"}
+    output_dir=${3:-"/data4/toan/projects/DiVE/dataset/NightReID_Market1501/finetune_model/finetune_stage2_ipadapter/"}
     max_steps=${4:-25000}
     batchsize=${5:-32}
     nepoch=${6:-100}

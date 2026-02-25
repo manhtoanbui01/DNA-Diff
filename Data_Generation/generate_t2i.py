@@ -19,11 +19,20 @@ from itertools import product
 from collections import defaultdict
 from multiprocessing import Process, Queue
 from queue import Empty
-
+import sys
+sys.path.append("/data4/toan/projects/DiVE/Data_Generation/deep_person_reid")
+from deep_person_reid.torchreid.utils import FeatureExtractor
+osnet = FeatureExtractor(
+    model_name='osnet_ain_x1_0',
+    model_path='deep_person_reid/osnet_ain_ms_d_m.pth.tar',
+    # device='cuda:0'
+)
+osnet.model.eval()
+osnet.model.requires_grad_(False)
     
 def generate_translations(args, in_queue, out_queue, gpu_id):
     model = DreamboothLoraGeneration(
-        checkpoint_path='/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_with_ipadapter/finetune_model/lora_ti/checkpoint-25000/',
+        checkpoint_path='/data4/toan/projects/DiVE/dataset/NightReID_Market1501/finetune_model/finetune_stage2_ipadapter/checkpoint-25000/',
         model_path=args.model_path,
         embed_path=args.embed_path,
         prompt=args.prompt,
@@ -147,6 +156,14 @@ def build_queue_via_metadata(
 
     # Sort class IDs so you process them in ascending order
     all_class_ids = class2label.keys()
+    # print("All class ids: ", all_class_ids)
+    
+    cond_market1501_path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501/cam7/"
+    label2embed = {}
+    for identity in os.listdir(cond_market1501_path):
+        possible_cond_image_paths = [os.path.join(cond_market1501_path, identity, image) for image in os.listdir(os.path.join(cond_market1501_path, identity))]
+        possible_cond_embeds = osnet(possible_cond_image_paths)
+        label2embed[identity] = possible_cond_embeds
 
     for cam_name in cameras:
         if cam_name not in camera_to_description:
@@ -155,34 +172,14 @@ def build_queue_via_metadata(
 
         cam_desc_str = camera_to_description[cam_name]
         
-        label2embed = {}
-
-        for i in range(len(dataset_obj)):
-            label = dataset_obj.get_label_by_idx(i)  # label is int
-            if label not in label2embed:
-                label2embed[label] = dataset_obj.get_cond_embed_by_idx(i)
-        # print(label2embed.keys())
 
         for class_id in all_class_ids:
             if int(class_id) <= threshold:
                 continue
-            if int(class_id) not in label2embed:
+            if class_id not in label2embed:
                 continue
-            cond_embed = label2embed[int(class_id)]
+            embeds = label2embed[f"{int(class_id):04d}"]
             
-            # found = False
-
-            # for i in range(len(dataset_obj)):
-            #     if dataset_obj.get_label_by_idx(i) == int(class_id):
-            #         cond_embed = dataset_obj.get_cond_embed_by_idx(i)
-            #         found = True
-            #         break
-
-            # if not found:
-            #     raise ValueError(f"There is no cond_embed for class_id={class_id}")
-
-            # We'll produce 'repeat_each_id' total images for this camera->class combo,
-            # but in chunks of size (images_per_call) to reduce pipeline calls.
 
             start_i = index_counter
             end_i = index_counter + repeat_each_id  # e.g. if repeat_each_id=12, range= [0..12)
@@ -194,6 +191,8 @@ def build_queue_via_metadata(
                 i_list = list(range(chunk_start, chunk_end))
 
                 # Enqueue i_list (rather than a single i)
+                idx = torch.randint(0, embeds.shape[0], (1,))
+                cond_embed = embeds[idx].squeeze(0)
                 in_queue.put((i_list, cam_name, cam_desc_str, class_id, cond_embed, strength))
 
             # Advance overall index_counter by 'repeat_each_id'
