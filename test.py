@@ -10,19 +10,27 @@
 #     print(key)
 
 
-import torch
+# import torch
 
-path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501/finetune_model/lora_ti/learned_embeds-steps-25000.bin"
+# path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501/finetune_model/lora_ti/learned_embeds-steps-25000.bin"
 
-data = torch.load(path, map_location="cpu")["name2placeholder"]
+# data = torch.load(path, map_location="cpu")["name2placeholder"]
 
-print("Type:", type(data))
+# print("Type:", type(data))
 
-if isinstance(data, dict):
-    print("Number of keys:", len(data))
-    print("Keys:")
-    for i, (k,v) in enumerate(data.items()):
-        # print(k)
-        print(f'{k}:{v}')
-        if i == 10:
-            break
+# if isinstance(data, dict):
+#     print("Number of keys:", len(data))
+#     print("Keys:")
+#     for i, (k,v) in enumerate(data.items()):
+#         # print(k)
+#         print(f'{k}:{v}')
+#         if i == 10:
+#             break
+
+from datasets import load_from_disk
+
+dataset = load_from_disk("/data4/toan/projects/DiVE/dataset/NightReID_Market1501_original_model")
+
+# print(dataset)
+print(dataset['description'][:10])
+print(dataset['camera'][:10])
