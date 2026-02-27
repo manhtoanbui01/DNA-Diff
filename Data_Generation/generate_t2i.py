@@ -32,7 +32,7 @@ osnet.model.requires_grad_(False)
     
 def generate_translations(args, in_queue, out_queue, gpu_id):
     model = DreamboothLoraGeneration(
-        checkpoint_path='/data4/toan/projects/DiVE/dataset/NightReID_Market1501/finetune_model/finetune_stage2_ipadapter/checkpoint-25000/',
+        checkpoint_path='/data4/toan/projects/DiVE/dataset/NightReID_Market1501/finetune_model/finetune_stage2_ipadapter/checkpoint-5000/',
         model_path=args.model_path,
         embed_path=args.embed_path,
         prompt=args.prompt,
@@ -97,6 +97,7 @@ def generate_translations(args, in_queue, out_queue, gpu_id):
             results.append( (i_list, cam, desc, nm, stg, out_images) )
 
         # 3) Save images
+        image_name = 0
         for i_list, cam_name, desc, nm, stg, image_list in results:
             # 'image_list' has len(i_list) images
             for single_i, pil_image in zip(i_list, image_list):
@@ -107,10 +108,11 @@ def generate_translations(args, in_queue, out_queue, gpu_id):
                 os.makedirs(subfolder, exist_ok=True)
 
             for local_idx, pil_image in enumerate(image_list, start=1):
-                filename = f"{local_idx:04d}.jpg"  # always 4-digit zero-padded
+                filename = f"{image_name}.jpg"
                 save_path = os.path.join(subfolder, filename)
                 pil_image.save(save_path)
                 print(f"Saved {save_path}")
+                image_name+=1
 
 
 

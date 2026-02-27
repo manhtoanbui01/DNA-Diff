@@ -489,7 +489,7 @@ def main():
     # Move unet, vae and text_encoder to device and cast to weight_dtype
     unet.to(accelerator.device, dtype=weight_dtype)
     vae.to(accelerator.device, dtype=weight_dtype)
-    osnet = osnet.model.to(accelerator.device)
+    osnet = osnet.model.to(accelerator.device)  # discard the FeatureExtractor wrapper and keep only the raw model.
     image_proj_model.to(accelerator.device)
     text_encoder.to(accelerator.device, dtype=weight_dtype)
     text_encoder.text_model.embeddings.token_embedding.weight.data = text_encoder.get_input_embeddings().weight.data.float()
@@ -539,7 +539,7 @@ def main():
     with torch.no_grad():
         for token, embed in learned_embeds.items():
             token_id = tokenizer.convert_tokens_to_ids(token)
-            print(f"Loaded weight for token id {token_id}")
+            # print(f"Loaded weight for token id {token_id}")
             token_embeds[token_id] = embed
 
     # 5. Freeze entire text encoder
@@ -578,7 +578,7 @@ def main():
     
     # Load stage 1 LoRA weight
     from safetensors.torch import load_file
-    ckpt_path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501/finetune_model/finetune_stage2_ipadapter/stage1_lora_weight/model.safetensors"
+    ckpt_path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501/finetune_model/lora_ti/checkpoint-25000/model.safetensors"
     state_dict = load_file(ckpt_path)
     missing, unexpected = unet.load_state_dict(state_dict, strict=False)
 
@@ -636,9 +636,9 @@ def main():
     lora_layers = AttnProcsLayers(unet.attn_processors)
     
     # Verify
-    for name, p in lora_layers.named_parameters():
-        if p.requires_grad:
-            print("REQUIRED GRAD LAYERS:", name)
+    # for name, p in lora_layers.named_parameters():
+    #     if p.requires_grad:
+    #         print("REQUIRED GRAD LAYERS:", name)
 
 
     # Enable TF32 for faster training on Ampere GPUs,

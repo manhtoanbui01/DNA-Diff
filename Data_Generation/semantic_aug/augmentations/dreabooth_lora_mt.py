@@ -273,8 +273,8 @@ class DreamboothLoraGeneration(GenerativeMixup):
                 missing_keys.extend([f"{name}.{k}" for k in m])
                 unexpected_keys.extend([f"{name}.{k}" for k in u])
 
-            print("Missing keys:", missing_keys[:10])
-            print("Unexpected keys:", unexpected_keys[:10])
+            print("Missing keys lora_ipadapter_state:", missing_keys)
+            print("Unexpected keys lora_ipadapter_state:", unexpected_keys)
             
             self.image_proj_model = ImageProjModel(
                 cross_attention_dim=unet.config.cross_attention_dim,
@@ -284,11 +284,11 @@ class DreamboothLoraGeneration(GenerativeMixup):
             image_proj_state = load_file(os.path.join(checkpoint_path, 'model_1.safetensors'))
             missing, unexpected = self.image_proj_model.load_state_dict(
                 image_proj_state,
-                strict=True
+                strict=False
             )
             self.image_proj_model.to(next(self.pipe.unet.parameters()).device)
-            print("Missing keys:", missing)
-            print("Unexpected keys:", unexpected)
+            print("Missing keys image_proj_state:", missing)
+            print("Unexpected keys image_proj_state:", unexpected)
             
             DreamboothLoraGeneration.pipe.scheduler = scheduler
  

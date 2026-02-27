@@ -16,7 +16,7 @@ def move_synthetic_data(synthetic_dir, target_dir, ipc: int = 3):  # ipc: number
             images = [image for image in os.listdir(os.path.join(synthetic_dir, cam, id))]
             random_ipc_images = random.sample(images, 3)
             for image in random_ipc_images:
-                new_name = str(f"{int(real_id):05d}") + f"_c{cam_name}" + "_" + image[1:]
+                new_name = str(f"{int(real_id):05d}") + f"_c{cam_name}" + "_" + image
                 shutil.copy(os.path.join(synthetic_dir, cam, id, image), os.path.join(target_dir, new_name))
         
 
