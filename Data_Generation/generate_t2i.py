@@ -32,7 +32,7 @@ osnet.model.requires_grad_(False)
     
 def generate_translations(args, in_queue, out_queue, gpu_id):
     model = DreamboothLoraGeneration(
-        checkpoint_path='/data4/toan/projects/DiVE/dataset/NightReID_Market1501/finetune_model/finetune_stage2_ipadapter/checkpoint-5000/',
+        checkpoint_path='/data4/toan/projects/DiVE/dataset/NightReID_Market1501/finetune_model/finetune_stage2_ipadapter_osnet/checkpoint-15000/',
         model_path=args.model_path,
         embed_path=args.embed_path,
         prompt=args.prompt,

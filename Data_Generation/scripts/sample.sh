@@ -7,7 +7,7 @@ function sample {
     model_path=${2:-"/data4/toan/projects/DiVE/stable-diffusion-v1-5"}
     lora_path=${3:-"finetune_model/lora_ti/pytorch_lora_weights.safetensors"}
     embed_path=${4:-"finetune_model/lora_ti/learned_embeds-steps-last.bin"}
-    output_dir=${5:-"/data4/toan/projects/DiVE/dataset/NightReID_Market1501/outputs_stage2_step_5000"}
+    output_dir=${5:-"/data4/toan/projects/DiVE/dataset/NightReID_Market1501/outputs_stage2_step_15000"}
     resolution=${6:-512}
     
     echo "Starting image generation with:"
