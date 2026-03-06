@@ -3,6 +3,16 @@ import shutil
 import argparse
 import json
 
+def extract_environment_name(image_name, ref_folder="/data4/toan/datasets/NightReID_all/NightReID_text_inversion/cam_lighting_merge_outlier/"):
+    for camera_name in os.listdir(ref_folder):
+        camera_path = os.path.join(ref_folder, camera_name)
+        for environment in os.listdir(camera_path):
+            environment_image_names = [name for name in os.listdir(os.path.join(camera_path, environment))]
+            if image_name in environment_image_names:
+                return (int(camera_name[-1])-1) * 50 + int(environment) + 1  # environment: [1,2,3,...,301]
+    raise ValueError(f"the isn't {image_name} in {ref_folder}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Convert NightReID dataset to SYSU-MM01 format")
 
@@ -16,7 +26,7 @@ def main():
     parser.add_argument(
         "--output_dir",
         type=str,
-        default="dataset/NightReID_Market1501_ori_with_ipadapter",
+        default="dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3",
         help="Output path of the NightReID dataset"
     )
     args = parser.parse_args()
@@ -51,7 +61,8 @@ def main():
         for idx, image_file in enumerate(image_list, start=1):
             old_image_path = os.path.join(nightreid_training_dir, image_file)
             camera_id = int(image_file[5]) + 3 if image_file[4] == 'R' else int(image_file[5])
-            new_image_path = os.path.join(output_dir, f'cam{camera_id}',f"{new_id:04d}", f"{idx:04d}.jpg")
+            environment_name = extract_environment_name(image_file)
+            new_image_path = os.path.join(output_dir, f'cam{camera_id}', f'env{environment_name}',f"{new_id:04d}", f"{idx:04d}.jpg")
             os.makedirs(os.path.dirname(new_image_path), exist_ok=True)
             shutil.copy(old_image_path, new_image_path)
     

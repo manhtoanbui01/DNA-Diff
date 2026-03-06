@@ -82,6 +82,7 @@ class PersonHugDataset(HugFewShotDataset):
         # If present, these might map cameras -> descriptions or cameras -> indices
         self.camera_to_description = metadata_dict.get("camera_to_description", {})
         self.description_to_camera = metadata_dict.get("description_to_camera", {})
+        self.environment_to_description = metadata_dict.get("environment_to_description", {})
         self.camera_indices = metadata_dict.get("camera_indices", {})
 
         # -------------------------------------------
@@ -324,6 +325,7 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
 
         # (B) Access the textual description from the dataset
         domain_description = self.dataset[idx]['description'].strip()
+        environment_description = self.dataset[idx]['environment_description'].strip()
         
         path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501/finetune_model/lora_ti/learned_embeds-steps-25000.bin"
         self.name2placeholder = torch.load(path, map_location="cpu")["name2placeholder"]
@@ -335,14 +337,15 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
 
             # Append the "super_class_name" if you want, e.g. "person"
             content += " person"
+            
+            environment = environment_description + " conditions"
 
-            # (D) Choose a template. Now each template has form "a {} photo of a {}", etc.
+            # (D) Choose a template. Now each template has form "a {} photo of a {} in {}", etc.
             template = random.choice(IMAGENET_TEMPLATES_DIVE)
 
-            # (E) Fill in two placeholders:
-            #     1) the domain description
-            #     2) the subject content
-            prompt = template.format(domain_description, content)
+            prompt = template.format(domain_description, content, environment)
+            
+            # print(f'Using caption: {prompt}')
         else:
             # If not using the "class prompt" approach, pick a random line from description
             # e.g. in case the user's 'description' has multiple lines

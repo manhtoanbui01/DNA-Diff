@@ -18,7 +18,7 @@ def main():
     parser.add_argument(
         "--sysu_dir",
         type=str,
-        default="/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_with_ipadapter/",
+        default="/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3/",
         help="Root directory path of the SYSU-MM01 dataset"
     )
     parser.add_argument(
@@ -44,7 +44,7 @@ def main():
 
     # Name of the new camera folder
     new_cam_folder = "cam7"
-    new_cam_dir = os.path.join(sysu_dir, new_cam_folder)
+    new_cam_dir = os.path.join(sysu_dir, new_cam_folder, "env301")
 
     # Create the new camera folder (if it does not exist)
     os.makedirs(new_cam_dir, exist_ok=True)

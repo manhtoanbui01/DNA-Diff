@@ -330,8 +330,10 @@ class DreamboothLoraGeneration(GenerativeMixup):
 
         name += " person"
         desc = metadata.get("description", "")
+        env_desc = metadata.get("environment_description", "")
+        env_desc += " conditions"
         # Single prompt string
-        prompt_str = self.prompt.format(name=name, description=desc)
+        prompt_str = self.prompt.format(name=name, description=desc, conditions=env_desc)
         print("Using prompt:", prompt_str)
         
         device = next(self.pipe.unet.parameters()).device

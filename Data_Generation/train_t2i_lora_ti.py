@@ -48,7 +48,6 @@ from diffusers.utils import check_min_version, is_wandb_available
 from diffusers.utils.import_utils import is_xformers_available
 
 from typing import Any, Tuple, Dict
-from lora_ipadapter import LoRAIPAdapterAttnProcessor, ImageProjModel
 import kornia
 
 # os.environ["http_proxy"]="http://localhost:8890"
@@ -309,7 +308,7 @@ def parse_args():
     parser.add_argument(
         "--resume_from_checkpoint",
         type=str,
-        default=None,
+        default='latest',
         help=(
             "Whether training should be resumed from a previous checkpoint. Use a path saved by"
             ' `--checkpointing_steps`, or `"latest"` to automatically select the last available checkpoint.'
@@ -387,20 +386,6 @@ def extract_features(model, image_tensor):
     return features
 
 
-# def save_progress(text_encoder, placeholder_token_ids, accelerator, args, name2placeholder, placeholder2name, save_path):
-#     logger.info("Saving embeddings")
-#     learned_embeds = (
-#         accelerator.unwrap_model(text_encoder)
-#         .get_input_embeddings()
-#         .weight[placeholder_token_ids]
-#     )
-#     learned_embeds_dict = {}
-#     for learned_embed, (name, placeholder) in zip(learned_embeds, name2placeholder.items()):
-#         learned_embeds_dict[placeholder] = learned_embed
-    
-#     torch.save(dict(learned_embeds_dict = learned_embeds_dict, name2placeholder=name2placeholder, placeholder2name=placeholder2name), save_path)
-
-
 
 def main():
 
@@ -460,22 +445,7 @@ def main():
     # freeze parameters of models to save more memory
     unet.requires_grad_(False)
     vae.requires_grad_(False)
-    from deep_person_reid.torchreid.utils import FeatureExtractor
-    osnet = FeatureExtractor(
-        model_name='osnet_ain_x1_0',
-        model_path='deep_person_reid/osnet_ain_ms_d_m.pth.tar',
-        # device='cuda:0'
-    )
-    osnet.model.eval()
-    osnet.model.requires_grad_(False)
-    
-    image_proj_model = ImageProjModel(
-        cross_attention_dim=unet.config.cross_attention_dim,
-        ip_embeddings_dim=512,
-        ip_extra_context_tokens=4,
-    )
-    image_proj_model.train()
-    image_proj_model.requires_grad_(True)
+
 
 
     # For mixed precision training we cast all non-trainable weigths (vae, non-lora text_encoder and non-lora unet) to half-precision
@@ -489,8 +459,6 @@ def main():
     # Move unet, vae and text_encoder to device and cast to weight_dtype
     unet.to(accelerator.device, dtype=weight_dtype)
     vae.to(accelerator.device, dtype=weight_dtype)
-    osnet = osnet.model.to(accelerator.device)  # discard the FeatureExtractor wrapper and keep only the raw model.
-    image_proj_model.to(accelerator.device)
     text_encoder.to(accelerator.device, dtype=weight_dtype)
     text_encoder.text_model.embeddings.token_embedding.weight.data = text_encoder.get_input_embeddings().weight.data.float()
 #endregion
@@ -561,18 +529,12 @@ def main():
             block_id = int(name[len("down_blocks.")])
             hidden_size = unet.config.block_out_channels[block_id]
 
-        if cross_attention_dim:
-            lora_ipadapter_attn_procs[name] = LoRAIPAdapterAttnProcessor(
-                hidden_size=hidden_size,
-                cross_attention_dim=cross_attention_dim,
-                lora_rank=args.rank,
-            )
-        else:
-            lora_ipadapter_attn_procs[name] = LoRAAttnProcessor(
-                hidden_size=hidden_size,
-                cross_attention_dim=cross_attention_dim,
-                rank=args.rank,
-            )
+        
+        lora_ipadapter_attn_procs[name] = LoRAAttnProcessor(
+            hidden_size=hidden_size,
+            cross_attention_dim=cross_attention_dim,
+            rank=args.rank,
+        )
             
     unet.set_attn_processor(lora_ipadapter_attn_procs)
     
@@ -625,13 +587,6 @@ def main():
         snr = (alpha / sigma) ** 2
         return snr
 
-
-
-    # Freeze LoRA, only finetune IPAdapter
-    for module in unet.attn_processors.values():
-        for name, param in module.named_parameters():
-            if "lora" in name:
-                param.requires_grad = False
     
     lora_layers = AttnProcsLayers(unet.attn_processors)
     
@@ -665,8 +620,7 @@ def main():
         optimizer_cls = torch.optim.AdamW
 
     optimizer = optimizer_cls(
-        [{'params': lora_layers.parameters(), 'lr': args.learning_rate if not args.ti_only else 0},
-         {'params': image_proj_model.parameters(), 'lr': args.learning_rate},],
+        [{'params': lora_layers.parameters(), 'lr': args.learning_rate if not args.ti_only else 0}],
         betas=(args.adam_beta1, args.adam_beta2),
         weight_decay=args.adam_weight_decay,
         eps=args.adam_epsilon,
@@ -729,8 +683,8 @@ def main():
 #endregion
 
     # Prepare everything with our `accelerator`.
-    lora_layers, image_proj_model, text_encoder, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
-        lora_layers, image_proj_model, text_encoder, optimizer, train_dataloader, lr_scheduler
+    lora_layers, text_encoder, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
+        lora_layers, text_encoder, optimizer, train_dataloader, lr_scheduler
     )
 #region Training info and resume
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
@@ -802,7 +756,7 @@ def main():
                     progress_bar.update(1)
                 continue
             # import pdb;pdb.set_trace()
-            with accelerator.accumulate(unet, image_proj_model):
+            with accelerator.accumulate(unet):
                 # Convert images to latent space
                 latents = vae.encode(batch["pixel_values"].to(dtype=weight_dtype)).latent_dist.sample()
                 latents = latents * vae.config.scaling_factor
@@ -826,9 +780,7 @@ def main():
                 # import pdb;pdb.set_trace()
                 # Get the text embedding for conditioning
                 encoder_hidden_states = text_encoder(batch["input_ids"])[0].to(dtype=weight_dtype) #[16, 77, 768] batch["input_ids"] [16, 77]
-                osnet_embeds = extract_features(osnet, batch["cond_pixel_values"])
-                ipadapter_embeds = image_proj_model(osnet_embeds)
-                encoder_hidden_states = (encoder_hidden_states, ipadapter_embeds)
+
                 # Get the target for loss depending on the prediction type
                 if args.prediction_type is not None:
                     # set prediction_type of scheduler if defined
@@ -910,19 +862,6 @@ def main():
                                     removing_checkpoint = os.path.join(args.output_dir, removing_checkpoint)
                                     shutil.rmtree(removing_checkpoint)
 
-                        # weight_name = (
-                        #     f"learned_embeds-steps-{global_step}.bin"
-                        # )
-                        
-                        # save_progress(
-                        #     text_encoder,
-                        #     placeholder_token_ids,
-                        #     accelerator,
-                        #     args,
-                        #     name2placeholder=name2placeholder,
-                        #     placeholder2name=placeholder2name,      
-                        #     save_path = os.path.join(args.output_dir, weight_name),
-                        # )
                         save_path = os.path.join(args.output_dir, f"checkpoint-{global_step}")
                         accelerator.save_state(save_path)
                         logger.info(f"Saved state to {save_path}")
@@ -938,23 +877,6 @@ def main():
     if accelerator.is_main_process:
         unet = unet.to(torch.float32)
         unet.save_attn_procs(args.output_dir)
-        # weight_name = (
-        #     f"learned_embeds-steps-last.bin"
-        # )
-        image_proj_model_to_save = accelerator.unwrap_model(image_proj_model)
-        torch.save(
-            image_proj_model_to_save.state_dict(),
-            os.path.join(args.output_dir, "image_proj_model.bin")
-        )
-        # save_progress(
-        #     text_encoder,
-        #     placeholder_token_ids,
-        #     accelerator,
-        #     args,
-        #     name2placeholder=name2placeholder,
-        #     placeholder2name=placeholder2name,
-        #     save_path = os.path.join(args.output_dir, weight_name),
-        # )
 
     accelerator.end_training()
     print("All processes finished.")
