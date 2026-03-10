@@ -563,7 +563,7 @@ def main():
     
     # Load stage 1 LoRA weight
     from safetensors.torch import load_file
-    ckpt_path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3/finetune_model/finetune_stage2_envtoken/checkpoint-10000/model.safetensors"
+    ckpt_path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity/finetune_model/finetune_stage2_envtoken/checkpoint-10000/model.safetensors"
     state_dict = load_file(ckpt_path)
     missing, unexpected = unet.load_state_dict(state_dict, strict=False)
 

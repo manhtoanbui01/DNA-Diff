@@ -18,7 +18,7 @@ def main():
     parser.add_argument(
         "--sysu_dir",
         type=str,
-        default="/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3/",
+        default="/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity/",
         help="Root directory path of the SYSU-MM01 dataset"
     )
     parser.add_argument(

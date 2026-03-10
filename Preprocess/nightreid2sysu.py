@@ -3,13 +3,14 @@ import shutil
 import argparse
 import json
 
-def extract_environment_name(image_name, ref_folder="/data4/toan/datasets/NightReID_all/NightReID_text_inversion/cam_lighting_merge_outlier/"):
+def extract_environment_name(image_name, ref_folder="/data4/toan/datasets/NightReID_all/NightReID_text_inversion/cam_lighting_intensity/"):
     for camera_name in os.listdir(ref_folder):
         camera_path = os.path.join(ref_folder, camera_name)
         for environment in os.listdir(camera_path):
             environment_image_names = [name for name in os.listdir(os.path.join(camera_path, environment))]
             if image_name in environment_image_names:
-                return (int(camera_name[-1])-1) * 50 + int(environment) + 1  # environment: [1,2,3,...,301]
+                # return (int(camera_name[-1])-1) * 50 + int(environment) + 1  # environment: [1,2,3,...,301]
+                return int(environment)
     raise ValueError(f"the isn't {image_name} in {ref_folder}")
 
 
@@ -26,7 +27,7 @@ def main():
     parser.add_argument(
         "--output_dir",
         type=str,
-        default="dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3",
+        default="dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity",
         help="Output path of the NightReID dataset"
     )
     args = parser.parse_args()

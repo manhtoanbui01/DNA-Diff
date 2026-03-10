@@ -226,7 +226,8 @@ class DreamboothLoraGeneration(GenerativeMixup):
             scheduler = DPMSolverMultistepScheduler.from_config(DreamboothLoraGeneration.pipe.scheduler.config, local_files_only=True)
             self.placeholder2name = None
             self.name2placeholder = None
-            embed_path = os.path.join(os.path.dirname(os.path.normpath(checkpoint_path)), f'learned_embeds-steps-last.bin')
+            # embed_path = os.path.join(os.path.dirname(os.path.normpath(checkpoint_path)), f'learned_embeds-steps-last.bin')
+            embed_path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501/finetune_model/lora_ti/learned_embeds-steps-last.bin"
             self.name2placeholder, self.placeholder2name = load_diffmix_embeddings(embed_path, DreamboothLoraGeneration.pipe.text_encoder, DreamboothLoraGeneration.pipe.tokenizer)
             
             unet = DreamboothLoraGeneration.pipe.unet
