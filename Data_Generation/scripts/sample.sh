@@ -7,7 +7,7 @@ function sample {
     model_path=${2:-"/data4/toan/projects/DiVE/stable-diffusion-v1-5"}
     lora_path=${3:-"finetune_model/lora_ti/pytorch_lora_weights.safetensors"}
     embed_path=${4:-"finetune_model/lora_ti/learned_embeds-steps-last.bin"}
-    output_dir=${5:-"/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity/output_stage3_step25000_many_images"}
+    output_dir=${5:-"/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity/output_stage3_step25000_sample_cond_image_each_id"}
     resolution=${6:-512}
     
     echo "Starting image generation with:"
@@ -21,12 +21,12 @@ function sample {
     # Export the data directory for the Python script to use
     export HUG_LOCAL_IMAGE_TRAIN_DIR="$data_dir"
     
-    python generate_t2i.py \
+    python generate_t2i_same_id_same_cond_image.py \
     --output_path "$output_dir" \
     --resolution $resolution \
     --gpu_ids 0 1 2 3 4 5 6 7 \
     --cameras cam1 cam2 cam3 cam4 cam5 cam6 \
-    --repeat_each_id 10 \
+    --repeat_each_id 3 \
     --batch_size 60 \
     --images_per_call 1 \
     --model_path "$model_path" \
