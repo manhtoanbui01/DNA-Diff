@@ -36,7 +36,7 @@ def main():
     args = parser.parse_args()
     
     
-    move_synthetic_data(args.input, args.output, 2)
+    move_synthetic_data(args.input, args.output, 3)
 
 
 if __name__ == "__main__":

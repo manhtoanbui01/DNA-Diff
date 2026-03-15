@@ -3,11 +3,11 @@
 
 function sample {
     # Default arguments if not provided
-    data_dir=${1:-"/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity/"}
+    data_dir=${1:-"/data4/toan/projects/DiVE/dataset/NightReID_DukeMTMC_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/"}
     model_path=${2:-"/data4/toan/projects/DiVE/stable-diffusion-v1-5"}
     lora_path=${3:-"finetune_model/lora_ti/pytorch_lora_weights.safetensors"}
     embed_path=${4:-"finetune_model/lora_ti/learned_embeds-steps-last.bin"}
-    output_dir=${5:-"/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity/output_stage3_step25000_sample_cond_image_each_id"}
+    output_dir=${5:-"/data4/toan/projects/DiVE/dataset/NightReID_DukeMTMC_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/output_stage3_step25000"}
     resolution=${6:-512}
     
     echo "Starting image generation with:"
@@ -21,7 +21,7 @@ function sample {
     # Export the data directory for the Python script to use
     export HUG_LOCAL_IMAGE_TRAIN_DIR="$data_dir"
     
-    python generate_t2i_same_id_same_cond_image.py \
+    python generate_t2i.py \
     --output_path "$output_dir" \
     --resolution $resolution \
     --gpu_ids 0 1 2 3 4 5 6 7 \

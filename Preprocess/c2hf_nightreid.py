@@ -24,6 +24,32 @@ def read_ids(file_path):
 import random
 import string
 
+def generate_unique_descriptions(count):
+    """
+    Generate 'count' random codes of length 4 with no character overlap among them.
+    If count > 15, it will raise a ValueError, because we only have 62 distinct
+    alphanumeric characters in total.
+    """
+    all_chars = list(string.ascii_letters + string.digits)  # 62 unique chars
+    random.shuffle(all_chars)  # randomize the pool of characters
+
+    max_codes = len(all_chars) // 4  # each code needs 4 unique chars
+    if count > max_codes:
+        raise ValueError(
+            f"Cannot generate {count} completely different codes of length 4. "
+            f"Maximum possible is {max_codes}."
+        )
+
+    codes = []
+    start = 0
+    for _ in range(count):
+        # Take 4 characters without overlap
+        chunk = all_chars[start : start + 4]
+        codes.append("".join(chunk))
+        start += 4
+
+    return codes
+
 def generate_unique_environment_tokens(count, cam_tokens = None, length=4):
     """
     Generate `count` unique random alphanumeric tokens of given length.
@@ -52,7 +78,7 @@ def main():
     
     train_id_path = os.path.join(base_path, "exp", "train_id.txt")
     all_ids = read_ids(train_id_path)
-    id_to_label = {f"{int(id_str):04d}": i for i, id_str in enumerate(all_ids)}
+    id_to_label = {f"{int(id_str):04d}": i for i, id_str in enumerate(all_ids)}  # {'0001': 0, '0002': 1, ...}
     
     
     
@@ -61,15 +87,12 @@ def main():
     data = {"image": [], "label": [], "environment": [], "environment_description": [], "cond_image": [], "description": [], "camera": []}
     
     # Generate per-camera code descriptions
-    # camera_descriptions = generate_unique_descriptions(num_cameras) 
+    camera_descriptions = generate_unique_descriptions(num_cameras) 
     
     # Create mappings
-    # camera_to_description = {f'cam{i}': desc for i, desc in enumerate(camera_descriptions, 1)}
-    # description_to_camera = {desc: f"cam{i}" for i, desc in enumerate(camera_descriptions, 1)}
+    camera_to_description = {f'cam{i}': desc for i, desc in enumerate(camera_descriptions, 1)}
+    description_to_camera = {desc: f"cam{i}" for i, desc in enumerate(camera_descriptions, 1)}
     
-    camera_to_description = {"cam1": "x46E", "cam2": "el7d", "cam3": "Bwh2", "cam4": "SOHz", "cam5": "DApu", "cam6": "3iLj", "cam7": "9TaR"}
-    print(f'Camera to description {camera_to_description}')
-    description_to_camera = {desc: cam for cam, desc in camera_to_description.items()}
     
     environment_descriptions =  generate_unique_environment_tokens(count=301, cam_tokens=camera_to_description.values())
     environment_to_description = {f'env{i}': desc for i, desc in enumerate(environment_descriptions, 1)}
@@ -103,10 +126,6 @@ def main():
                         possible_cond_image_paths.append(os.path.join(env_path, identity, image))
         return possible_cond_image_paths
             
-        
-        
-        
-    
     
     def process_images(camera_path, camera_name):
         description = camera_to_description[camera_name]

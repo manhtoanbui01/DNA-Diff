@@ -4,7 +4,7 @@ import random
 import torch
 # sys.path.append('/data/zhicai/code/Diff-Mix/')
 from semantic_aug.few_shot_dataset import HugFewShotDataset
-from semantic_aug.datasets.utils import IMAGENET_TEMPLATES_DIVE
+from semantic_aug.datasets.utils import IMAGENET_TEMPLATES_DIVE_STEP1, IMAGENET_TEMPLATES_DIVE
 # from semantic_aug.generative_augmentation import GenerativeAugmentation
 from typing import Any, Tuple, Dict
 # from torch.utils.data import Dataset
@@ -191,6 +191,161 @@ class PersonHugDataset(HugFewShotDataset):
             name=self.label2class[self.get_label_by_idx(idx)],
             super_class=self.super_class_name
         )
+
+class PersonHugDatasetForT2IStep1(torch.utils.data.Dataset):
+
+    super_class_name = SUPER_CLASS_NAME
+
+    def __init__(self, *args, split: str = "train",
+                 seed: int = 0, 
+                 image_train_dir: str = HUG_LOCAL_IMAGE_TRAIN_DIR, 
+                 max_train_samples: int = -1,
+                 class_prompts_ratio: float = 0.5,
+                 resolution: Tuple[int, int] = (512, 256),#int = 512,
+                 center_crop: bool = False,
+                 random_flip: bool = False,
+                 use_placeholder: bool = False,
+                 examples_per_class: int = -1,
+                 **kwargs):
+
+        super().__init__()    
+
+        # dataset = load_dataset(image_train_dir, split='train')
+        print(f"image_train_dir: {image_train_dir}")
+        dataset = load_from_disk(image_train_dir)
+
+        random.seed(seed)
+        np.random.seed(seed)
+        if max_train_samples is not None and max_train_samples > 0:
+            dataset = dataset.shuffle(seed=seed).select(range(max_train_samples))
+        if examples_per_class is not None and examples_per_class > 0:
+            all_labels = dataset['label']
+            label_to_indices = defaultdict(list)
+            for i, label in enumerate(all_labels):
+                label_to_indices[label].append(i)
+
+            _all_indices = []
+            for key, items in label_to_indices.items():
+                try:
+                    sampled_indices = random.sample(items, examples_per_class)
+                except ValueError:
+                    print(f"{key}: Sample larger than population or is negative, use random.choices instead")
+                    sampled_indices = random.choices(items, k=examples_per_class)
+                    
+                label_to_indices[key] = sampled_indices 
+                _all_indices.extend(sampled_indices)
+            dataset = dataset.select(_all_indices)
+        self.class_names = [name.replace('/',' ') for name in dataset.features['label'].names]
+        self.dataset = dataset
+        self.class2label = self.dataset.features['label']._str2int
+        self.label2class = {v: k for k, v in self.class2label.items()} 
+        self.num_classes = len(self.class_names)
+        self.class_prompts_ratio = class_prompts_ratio
+        self.use_placeholder = use_placeholder        
+        self.name2placeholder = None
+        self.placeholder2name = None
+        self.label_to_indices = defaultdict(list)
+        for i, label in enumerate(self.dataset['label']):
+            self.label_to_indices[label].append(i)
+            
+        self.transform = transforms.Compose(
+        [
+            transforms.Resize(resolution, interpolation=transforms.InterpolationMode.BILINEAR),
+            transforms.CenterCrop(resolution) if center_crop else transforms.RandomCrop(resolution),
+            transforms.RandomHorizontalFlip() if random_flip else transforms.Lambda(lambda x: x),
+            transforms.ToTensor(),
+            transforms.Normalize([0.5], [0.5]),
+        ])
+
+        import json
+
+        desc_text = dataset.info.description or ""
+        lines = desc_text.split("\n", 1)
+        if len(lines) > 1 and lines[0].startswith("Custom metadata:"):
+            # The second part lines[1] is presumably the JSON
+            metadata_json = lines[1]
+            try:
+                metadata_dict = json.loads(metadata_json)
+            except json.JSONDecodeError as e:
+                print("[PersonHugDataset] Warning: Could not decode JSON metadata:", e)
+                metadata_dict = {}
+        else:
+            metadata_dict = {}
+
+        # Store it in self so we can access later
+        self.metadata_dict = metadata_dict
+        # If present, these might map cameras -> descriptions or cameras -> indices
+        self.camera_to_description = metadata_dict.get("camera_to_description", {})
+        self.description_to_camera = metadata_dict.get("description_to_camera", {})
+        self.camera_indices = metadata_dict.get("camera_indices", {})
+
+
+    def __len__(self):
+        
+        return len(self.dataset)
+
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, int]:
+        # import pdb;pdb.set_trace()
+        image = self.get_image_by_idx(idx)
+        prompt = self.get_prompt_by_idx(idx)
+        # label = self.get_label_by_idx(idx)
+
+        return dict(pixel_values=self.transform(image), caption = prompt)
+    
+    def get_image_by_idx(self, idx: int) -> Image.Image:
+
+        return self.dataset[idx]['image'].convert('RGB')
+
+    def get_label_by_idx(self, idx: int) -> int:
+
+        return self.dataset[idx]['label']
+
+    def get_prompt_by_idx(self, idx: int) -> str:
+        """
+        Return a string prompt for the given index,
+        using the updated IMAGENET_TEMPLATES_SMALL
+        which has two placeholders: 
+        - First for description 
+        - Second for name
+        """
+
+        # (A) Decide if we build a prompt from label or from random lines in description
+        #     Right now, we always do the "class prompt" path if random.random() < self.class_prompts_ratio,
+        #     else we pick a random line from the description. 
+        #     (Change that ratio or logic as desired.)
+        flag = random.random() < self.class_prompts_ratio
+
+        # (B) Access the textual description from the dataset
+        domain_description = self.dataset[idx]['description'].strip()
+        
+        if flag:
+            # import pdb;pdb.set_trace()
+            # (C) Optionally get the placeholder name vs. direct class label
+            if self.use_placeholder and self.name2placeholder is not None:
+                content = self.name2placeholder[self.label2class[self.dataset[idx]['label']]]
+            else:
+                content = self.label2class[self.dataset[idx]['label']]
+
+            # Append the "super_class_name" if you want, e.g. "person"
+            content += " person"
+
+            # (D) Choose a template. Now each template has form "a {} photo of a {}", etc.
+            template = random.choice(IMAGENET_TEMPLATES_DIVE_STEP1)
+
+            # (E) Fill in two placeholders:
+            #     1) the domain description
+            #     2) the subject content
+            prompt = template.format(domain_description, content)
+        else:
+            # If not using the "class prompt" approach, pick a random line from description
+            # e.g. in case the user's 'description' has multiple lines
+            lines = domain_description.split('\n')
+            prompt = random.choice(lines) if lines else domain_description
+
+        return prompt
+
+    def get_metadata_by_idx(self, idx: int) -> dict:
+        return dict(name=self.label2class[self.get_label_by_idx(idx)])
     
 
 class PersonHugDatasetForT2I(torch.utils.data.Dataset):
@@ -327,13 +482,11 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
         domain_description = self.dataset[idx]['description'].strip()
         environment_description = self.dataset[idx]['environment_description'].strip()
         
-        path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501/finetune_model/lora_ti/learned_embeds-steps-25000.bin"
-        self.name2placeholder = torch.load(path, map_location="cpu")["name2placeholder"]
-        self.placeholder2name = torch.load(path, map_location="cpu")["placeholder2name"]
         if flag:
             # import pdb;pdb.set_trace()
             # (C) Optionally get the placeholder name vs. direct class label
-            content = self.name2placeholder[self.label2class[self.dataset[idx]['label']]]
+            content = self.label2class[self.dataset[idx]['label']]
+
 
             # Append the "super_class_name" if you want, e.g. "person"
             content += " person"

@@ -50,6 +50,9 @@ from diffusers.utils.import_utils import is_xformers_available
 from typing import Any, Tuple, Dict
 from lora_ipadapter import LoRAIPAdapterAttnProcessor, ImageProjModel
 import kornia
+from torch.utils.tensorboard import SummaryWriter
+
+
 
 # os.environ["http_proxy"]="http://localhost:8890"
 # os.environ["https_proxy"]="http://localhost:8890"
@@ -391,6 +394,7 @@ def main():
 
     args = parse_args()
     logging_dir = Path(args.output_dir, args.logging_dir)
+    writer = SummaryWriter(os.path.join(args.output_dir, "run"))
 
     accelerator_project_config = ProjectConfiguration(project_dir=args.output_dir, logging_dir=logging_dir)
 
@@ -518,7 +522,7 @@ def main():
             
     # index_no_updates = torch.ones((len(tokenizer),), dtype=torch.bool) #[49608] # no update tokens
 
-    text_encoder_weight_path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501/finetune_model/lora_ti/learned_embeds-steps-25000.bin"
+    text_encoder_weight_path = "/data4/toan/projects/DiVE/dataset/NightReID_DukeMTMC_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage1_dive/learned_embeds-steps-25000.bin"
     learned_embeds = torch.load(text_encoder_weight_path, map_location="cpu")["learned_embeds_dict"]
 
     with torch.no_grad():
@@ -563,7 +567,7 @@ def main():
     
     # Load stage 1 LoRA weight
     from safetensors.torch import load_file
-    ckpt_path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity/finetune_model/finetune_stage2_envtoken/checkpoint-10000/model.safetensors"
+    ckpt_path = "/data4/toan/projects/DiVE/dataset/NightReID_DukeMTMC_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage2_envtoken/checkpoint-10000/model.safetensors"
     state_dict = load_file(ckpt_path)
     missing, unexpected = unet.load_state_dict(state_dict, strict=False)
 
@@ -906,6 +910,8 @@ def main():
                         logger.info(f"Saved state to {save_path}")
 
             logs = {"step_loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
+            writer.add_scalar("loss/train", loss.detach().item(), global_step)
+            writer.add_scalar("lr", lr_scheduler.get_last_lr()[0], global_step)
             progress_bar.set_postfix(**logs)
 
             if global_step >= args.max_train_steps:
