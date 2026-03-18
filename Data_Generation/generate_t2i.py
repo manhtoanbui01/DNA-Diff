@@ -29,12 +29,16 @@ osnet = FeatureExtractor(
 )
 osnet.model.eval()
 osnet.model.requires_grad_(False)
+
+data_dir = os.environ.get("HUG_LOCAL_IMAGE_TRAIN_DIR")
+
     
 def generate_translations(args, in_queue, out_queue, gpu_id):
     model = DreamboothLoraGeneration(
-        checkpoint_path='/data4/toan/projects/DiVE/dataset/NightReID_DukeMTMC_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage3_ipadapter/checkpoint-25000/',
+        # checkpoint_path='/data4/toan/projects/DiVE/dataset/NightReID_DukeMTMC_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage3_ipadapter/checkpoint-25000/',
+        checkpoint_path = os.path.join(data_dir, "finetune_model", "finetune_stage3_ipadapter", "checkpoint-25000"),
         model_path=args.model_path,
-        embed_path=args.embed_path,
+        embed_path=os.path.join(data_dir, "finetune_model", "finetune_stage1_dive", "learned_embeds-steps-25000.bin"),
         prompt=args.prompt,
         guidance_scale=args.guidance_scale,
         mask=args.mask,
@@ -165,7 +169,8 @@ def build_queue_via_metadata(
     # print("Class to label: ", class2label)
     # print("All class ids: ", all_class_ids)
     
-    cond_market1501_path = "/data4/toan/projects/DiVE/dataset/NightReID_DukeMTMC_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/cam7/env301"
+    # cond_market1501_path = "/data4/toan/projects/DiVE/dataset/NightReID_DukeMTMC_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/cam7/env301"
+    cond_market1501_path = os.path.join(data_dir, "cam7", "env301")
     label2embed = {}
     for identity in os.listdir(cond_market1501_path):
         label = class2label[str(int(identity))]

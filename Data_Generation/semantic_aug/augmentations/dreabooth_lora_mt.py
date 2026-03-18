@@ -227,7 +227,7 @@ class DreamboothLoraGeneration(GenerativeMixup):
             self.placeholder2name = None
             self.name2placeholder = None
             # embed_path = os.path.join(os.path.dirname(os.path.normpath(checkpoint_path)), f'learned_embeds-steps-last.bin')
-            embed_path = "/data4/toan/projects/DiVE/dataset/NightReID_DukeMTMC_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage1_dive/learned_embeds-steps-last.bin"
+            # embed_path = "/data4/toan/projects/DiVE/dataset/NightReID_DukeMTMC_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage1_dive/learned_embeds-steps-last.bin"
             self.name2placeholder, self.placeholder2name = load_diffmix_embeddings(embed_path, DreamboothLoraGeneration.pipe.text_encoder, DreamboothLoraGeneration.pipe.tokenizer)
             
             unet = DreamboothLoraGeneration.pipe.unet

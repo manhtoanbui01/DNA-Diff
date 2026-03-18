@@ -27,7 +27,7 @@ def main():
     parser.add_argument(
         "--output_dir",
         type=str,
-        default="dataset/NightReID_DukeMTMC_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id",
+        default="dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_test",
         help="Output path of the NightReID dataset"
     )
     args = parser.parse_args()

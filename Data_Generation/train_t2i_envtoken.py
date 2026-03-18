@@ -505,7 +505,9 @@ def main():
             
     # index_no_updates = torch.ones((len(tokenizer),), dtype=torch.bool) #[49608] # no update tokens
 
-    text_encoder_weight_path = "/data4/toan/projects/DiVE/dataset/NightReID_DukeMTMC_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage1_dive/learned_embeds-steps-25000.bin"
+    # text_encoder_weight_path = "/data4/toan/projects/DiVE/dataset/NightReID_DukeMTMC_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage1_dive/learned_embeds-steps-25000.bin"
+    data_dir = os.environ.get("HUG_LOCAL_IMAGE_TRAIN_DIR")
+    text_encoder_weight_path = os.path.join(data_dir, "finetune_model", "finetune_stage1_dive", "learned_embeds-steps-25000.bin")
     learned_embeds = torch.load(text_encoder_weight_path, map_location="cpu")["learned_embeds_dict"]
 
     with torch.no_grad():
@@ -544,7 +546,8 @@ def main():
     
     # Load stage 1 LoRA weight
     from safetensors.torch import load_file
-    ckpt_path = "/data4/toan/projects/DiVE/dataset/NightReID_DukeMTMC_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage1_dive/checkpoint-25000/model.safetensors"
+    # ckpt_path = "/data4/toan/projects/DiVE/dataset/NightReID_DukeMTMC_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage1_dive/checkpoint-25000/model.safetensors"
+    ckpt_path = os.path.join(data_dir, "finetune_model", "finetune_stage1_dive", "checkpoint-25000", "model.safetensors")
     state_dict = load_file(ckpt_path)
     missing, unexpected = unet.load_state_dict(state_dict, strict=False)
 

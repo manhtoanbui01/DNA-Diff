@@ -231,19 +231,14 @@ def main():
     metadata_json = json.dumps(metadata_dict, indent=2)
     dataset.info.description = f"Custom metadata:\n{metadata_json}"
 
-    # Create the full output path by combining output_path and dataset name
-    full_output_path = os.path.join(output_path, current_dataset)
-    # Create directory if it doesn't exist
-    os.makedirs(full_output_path, exist_ok=True)
-
     # Save the dataset to the combined path
-    dataset.save_to_disk(full_output_path)
+    dataset.save_to_disk(output_path)
 
     # Print summary
     print(f"Dataset '{current_dataset}' created with {len(dataset)} images.")
     print(f"Number of cameras: {num_cameras}")
     print(f"Unique camera descriptions created: {len(set(data['description']))}")
-    print(f"Dataset saved to: {full_output_path}")
+    print(f"Dataset saved to: {output_path}")
     
     
 
