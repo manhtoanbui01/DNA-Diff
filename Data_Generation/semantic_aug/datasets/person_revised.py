@@ -482,10 +482,14 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
         domain_description = self.dataset[idx]['description'].strip()
         environment_description = self.dataset[idx]['environment_description'].strip()
         
+        
+        path = f"{HUG_LOCAL_IMAGE_TRAIN_DIR.rstrip('/')}/finetune_model/finetune_stage1_dive/learned_embeds-steps-25000.bin"
+        self.name2placeholder = torch.load(path, map_location="cpu")["name2placeholder"]
+        self.placeholder2name = torch.load(path, map_location="cpu")["placeholder2name"]
         if flag:
             # import pdb;pdb.set_trace()
             # (C) Optionally get the placeholder name vs. direct class label
-            content = self.label2class[self.dataset[idx]['label']]
+            content = self.name2placeholder[self.label2class[self.dataset[idx]['label']]]
 
 
             # Append the "super_class_name" if you want, e.g. "person"
