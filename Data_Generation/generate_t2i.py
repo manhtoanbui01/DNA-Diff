@@ -36,7 +36,7 @@ data_dir = os.environ.get("HUG_LOCAL_IMAGE_TRAIN_DIR")
 def generate_translations(args, in_queue, out_queue, gpu_id):
     model = DreamboothLoraGeneration(
         # checkpoint_path='/data4/toan/projects/DiVE/dataset/NightReID_DukeMTMC_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage3_ipadapter/checkpoint-25000/',
-        checkpoint_path = os.path.join(data_dir, "finetune_model", "finetune_stage3_ipadapter", "checkpoint-25000"),
+        checkpoint_path = os.path.join(data_dir, "finetune_model", "finetune_stage3_ipadapter", "checkpoint-15000"),
         model_path=args.model_path,
         embed_path=os.path.join(data_dir, "finetune_model", "finetune_stage1_dive", "learned_embeds-steps-25000.bin"),
         prompt=args.prompt,

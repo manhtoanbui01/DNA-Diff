@@ -1,24 +1,25 @@
 #!/bin/bash
 
-# sleep 3h
+GPU_IDS=1,2,3,4,5,6,7
+# GPU_IDS=7
 
-# source scripts/sample.sh
-# sample
 
-# cd ..
+echo "===== Step 1 ====="
+(
+    source scripts/finetune_step1.sh
+    CUDA_VISIBLE_DEVICES=$GPU_IDS finetune
+) && \
 
-# git add .
-# git commit -m "." || true
+echo "===== Step 2 ====="
+(
+    source scripts/finetune_step2.sh
+    CUDA_VISIBLE_DEVICES=$GPU_IDS finetune
+) && \
 
-# git checkout ori_step1_envtoken_step2_ipadapter_step3_full_12_cameras
+echo "===== Step 3 ====="
+(
+    source scripts/finetune_step3.sh
+    CUDA_VISIBLE_DEVICES=$GPU_IDS finetune
+)
 
-# cd Data_Generation
-
-# source scripts/finetune_step1.sh
-# CUDA_VISIBLE_DEVICES=1,2,3,4,5,6,7 finetune
-
-source scripts/finetune_step2.sh
-CUDA_VISIBLE_DEVICES=1,2,3,4,5,6,7 finetune
-
-source scripts/finetune_step3.sh
-CUDA_VISIBLE_DEVICES=1,2,3,4,5,6,7 finetune
+echo "===== All steps completed ====="

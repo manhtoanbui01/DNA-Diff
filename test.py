@@ -10,22 +10,23 @@
 #     print(key)
 
 
-# import torch
+import torch
 
-# path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501/finetune_model/lora_ti/learned_embeds-steps-25000.bin"
+path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501/finetune_model/lora_ti/learned_embeds-steps-25000.bin"
 
-# data = torch.load(path, map_location="cpu")["name2placeholder"]
+data = torch.load(path, map_location="cpu")["name2placeholder"]
 
-# print("Type:", type(data))
+print("Type:", type(data))
 
-# if isinstance(data, dict):
-#     print("Number of keys:", len(data))
-#     print("Keys:")
-#     for i, (k,v) in enumerate(data.items()):
-#         # print(k)
-#         print(f'{k}:{v}')
-#         if i == 10:
-#             break
+if isinstance(data, dict):
+    print("Number of keys:", len(data))
+    print("Keys:")
+    for i, (k,v) in enumerate(data.items()):
+        # print(k)
+        print(f'{k}:{v}')
+        print(type(k))
+        if i == 10:
+            break
 
 # from datasets import load_from_disk
 
@@ -36,8 +37,20 @@
 
 
 
-from datasets import load_from_disk
+# from datasets import load_from_disk
 
-dataset = load_from_disk("/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/NightReID_Market1501/")
+# dataset = load_from_disk("/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/")
 
-print(len(dataset))
+# # 1. Access the 'label' column's feature definitions
+# label_feature = dataset.features["label"]
+
+# # 2. Print the internal string-to-integer dictionary
+# # Note: it's stored in a hidden attribute called _str2int
+# print("--- String to Integer Mapping ---")
+# mapping = label_feature._str2int
+# print(mapping)
+
+# # 3. To see just a few examples (since you have 2001 IDs)
+# for i, (name, idx) in enumerate(mapping.items()):
+#     print(f"Person ID: {name} maps to Index: {idx}")
+#     if i >= 10: break # Stop after 5 examples

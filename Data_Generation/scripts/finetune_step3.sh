@@ -3,10 +3,10 @@
 
 function finetune {
     # Default arguments if not provided
-    data_dir=${1:-"/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_test/"}
+    data_dir=${1:-"/data4/toan/projects/DiVE/dataset/NightReID_CUHKSYSU_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity/"}
     model_path=${2:-"/data4/toan/projects/DiVE/stable-diffusion-v1-5"}
     output_dir=${3:-"${data_dir%/}/finetune_model/finetune_stage3_ipadapter/"}
-    max_steps=${4:-25000}
+    max_steps=${4:-15000}
     batchsize=${5:-32}
     nepoch=${6:-100}
     rank=${7:-128}
@@ -45,7 +45,7 @@ function finetune {
         --random_flip \
         --max_train_steps='$max_steps' \
         --num_train_epochs=$nepoch --checkpointing_steps=$checkpointing_steps \
-        --learning_rate=5e-05 \
+        --learning_rate=1e-04 \
         --lr_scheduler='constant' --lr_warmup_steps=0 \
         --seed=42 \
         --rank=$rank \

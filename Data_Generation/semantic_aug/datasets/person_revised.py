@@ -288,8 +288,9 @@ class PersonHugDatasetForT2IStep1(torch.utils.data.Dataset):
         # import pdb;pdb.set_trace()
         image = self.get_image_by_idx(idx)
         prompt = self.get_prompt_by_idx(idx)
+        
         # label = self.get_label_by_idx(idx)
-
+        # print(f"Label: {label}, prompt: {prompt}")
         return dict(pixel_values=self.transform(image), caption = prompt)
     
     def get_image_by_idx(self, idx: int) -> Image.Image:
@@ -444,7 +445,9 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
         image = self.get_image_by_idx(idx)
         prompt = self.get_prompt_by_idx(idx)
         cond_image = self.get_cond_image_by_idx(idx)
+        
         # label = self.get_label_by_idx(idx)
+        # print(f"Label: {label}, prompt: {prompt}")
 
         return dict(pixel_values=self.transform(image), cond_pixel_values=self.transform(cond_image), caption = prompt)
 

@@ -12,13 +12,13 @@ def main():
     parser.add_argument(
         "--market_gt_bbox_dir",
         type=str,
-        default="/data4/toan/projects/DiVE/dataset/reid_datasets/DukeMTMC/all_images",
+        default="/data4/toan/projects/DiVE/dataset/reid_datasets/CUHK03-NP/all_images",
         help="Path of the DukeMTMC dataset"
     )
     parser.add_argument(
         "--sysu_dir",
         type=str,
-        default="/data4/toan/projects/DiVE/dataset/NightReID_DukeMTMC_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/",
+        default="/data4/toan/projects/DiVE/dataset/NightReID_CUHK03_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity/",
         help="Root directory path of the SYSU-MM01 dataset"
     )
     parser.add_argument(
