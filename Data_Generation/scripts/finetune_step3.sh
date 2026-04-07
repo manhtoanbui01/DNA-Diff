@@ -3,7 +3,7 @@
 
 function finetune {
     # Default arguments if not provided
-    data_dir=${1:-"/data4/toan/projects/DiVE/dataset/NightReID_CUHKSYSU_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity/"}
+    data_dir=${1:-"/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/"}
     model_path=${2:-"/data4/toan/projects/DiVE/stable-diffusion-v1-5"}
     output_dir=${3:-"${data_dir%/}/finetune_model/finetune_stage3_ipadapter/"}
     max_steps=${4:-15000}

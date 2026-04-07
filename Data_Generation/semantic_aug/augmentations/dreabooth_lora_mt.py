@@ -67,6 +67,39 @@ def load_diffmix_embeddings(embed_path: str,
 
     return name2placeholder, placeholder2name
 
+def load_diffmix_embeddings_env(embed_path: str,
+                            text_encoder: CLIPTextModel,
+                            tokenizer: CLIPTokenizer,
+                            device="cuda",
+            ):
+
+    embedding_ckpt = torch.load(embed_path, map_location='cpu')
+    learned_embeds_dict = embedding_ckpt["learned_embeds_dict"]
+    env2placeholder = embedding_ckpt["env2placeholder"]
+    placeholder2env = embedding_ckpt["placeholder2env"]
+
+    env2placeholder = {k.replace('/',' ').replace('_',' '): v for k, v in env2placeholder.items()}
+    placeholder2env = {v: k.replace('/',' ').replace('_',' ') for k, v in env2placeholder.items()} 
+    
+    for token, token_embedding in learned_embeds_dict.items():
+
+        # add the token in tokenizer
+        num_added_tokens = tokenizer.add_tokens(token)
+        assert num_added_tokens > 0, ERROR_MESSAGE.format(token=token)
+    
+        # resize the token embeddings
+        text_encoder.resize_token_embeddings(len(tokenizer))
+        added_token_id = tokenizer.convert_tokens_to_ids(token)
+
+        # get the old word embeddings
+        embeddings = text_encoder.get_input_embeddings()
+
+        # get the id for the token and assign new embeds
+        embeddings.weight.data[added_token_id] = \
+            token_embedding.to(embeddings.weight.dtype)
+
+    return env2placeholder, placeholder2env
+
 def identity(*args):
     return args
 
@@ -229,6 +262,8 @@ class DreamboothLoraGeneration(GenerativeMixup):
             # embed_path = os.path.join(os.path.dirname(os.path.normpath(checkpoint_path)), f'learned_embeds-steps-last.bin')
             # embed_path = "/data4/toan/projects/DiVE/dataset/NightReID_DukeMTMC_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage1_dive/learned_embeds-steps-last.bin"
             self.name2placeholder, self.placeholder2name = load_diffmix_embeddings(embed_path, DreamboothLoraGeneration.pipe.text_encoder, DreamboothLoraGeneration.pipe.tokenizer)
+            embed_path_env = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage2_envtoken/learned_embeds-steps-last.bin"
+            self.env2placeholder, self.placeholder2env = load_diffmix_embeddings_env(embed_path_env, DreamboothLoraGeneration.pipe.text_encoder, DreamboothLoraGeneration.pipe.tokenizer)
             
             unet = DreamboothLoraGeneration.pipe.unet
             lora_ipadapter_attn_procs = {}
@@ -331,10 +366,12 @@ class DreamboothLoraGeneration(GenerativeMixup):
 
         name += " person"
         desc = metadata.get("description", "")
-        env_desc = metadata.get("environment_description", "")
-        env_desc += " conditions"
+        env_id = metadata.get("env_id", "")
+        if self.env2placeholder is not None:
+            env_id = self.env2placeholder.get(env_id, env_id)
+        env_id += " conditions"
         # Single prompt string
-        prompt_str = self.prompt.format(name=name, description=desc, conditions=env_desc)
+        prompt_str = self.prompt.format(name=name, description=desc, conditions=env_id)
         print("Using prompt:", prompt_str)
         
         device = next(self.pipe.unet.parameters()).device

@@ -63,7 +63,9 @@ from semantic_aug.datasets.person_revised import PersonHugDatasetForT2I
 logger = get_logger(__name__, log_level="INFO")
 
 PLACEHOLDER_TOKEN_TEMPLATE = '<class_{}>'
+PLACEHOLDER_ENV_TEMPLATE = '<env_{}>'
 INITIALIZER_TOKEN = 42170
+INITIALIZER_ENV_TOKEN = 42171
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Simple example of a training script.")
@@ -520,8 +522,24 @@ def main():
         for token_id in placeholder_token_ids:
             token_embeds[token_id] = token_embeds[initializer_token_id].clone() #把newly added token 赋予INITIALIZER_TOKEN对应的embedding的值
             
-    # index_no_updates = torch.ones((len(tokenizer),), dtype=torch.bool) #[49608] # no update tokens
-
+    placeholder_env_tokens = [PLACEHOLDER_ENV_TEMPLATE.format(i) for i in range(train_dataset.num_envs)]  #TEMPLATE '<env_{}>'
+    env2placeholder = {env: placeholder for env, placeholder in zip(train_dataset.environment_names, placeholder_env_tokens)}
+    placeholder2env = {placeholder: env for env, placeholder in zip(train_dataset.environment_names, placeholder_env_tokens)}
+    train_dataset.env2placeholder = env2placeholder
+    train_dataset.placeholder2env = placeholder2env 
+    
+    num_added_tokens = tokenizer.add_tokens(placeholder_env_tokens)
+    if num_added_tokens != train_dataset.num_envs:
+        raise ValueError(
+            f"Mismatching between added tokens and number of environments. Added {num_added_tokens} tokens, but there are {train_dataset.num_envs} environments."
+        )
+    text_encoder.resize_token_embeddings(len(tokenizer)) # [49408, 768]->[50814, 768]
+    token_embeds = text_encoder.get_input_embeddings().weight.data #[50814, 768]
+    initializer_env_id = INITIALIZER_ENV_TOKEN #42171
+    placeholder_env_ids = tokenizer.convert_tokens_to_ids(placeholder_env_tokens) #49408, 49409, 49410, 49411, 49412 ... 496607 #正常的embedding到49407结束
+    with torch.no_grad(): #placeholder_tokens ['<class_0>', ...'<class_1404>', '<class_1405>']
+        for token_id in placeholder_env_ids:
+            token_embeds[token_id] = token_embeds[initializer_env_id].clone() #把newly added token 赋予INITIALIZER_TOKEN对应的embedding的值
     # text_encoder_weight_path = "/data4/toan/projects/DiVE/dataset/NightReID_DukeMTMC_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage1_dive/learned_embeds-steps-25000.bin"
     data_dir = os.environ.get("HUG_LOCAL_IMAGE_TRAIN_DIR")
     text_encoder_weight_path = os.path.join(data_dir, "finetune_model", "finetune_stage1_dive", "learned_embeds-steps-25000.bin")
@@ -529,6 +547,15 @@ def main():
 
     with torch.no_grad():
         for token, embed in learned_embeds.items():
+            token_id = tokenizer.convert_tokens_to_ids(token)
+            # print(f"Loaded weight for token id {token_id}")
+            token_embeds[token_id] = embed
+
+    text_encoder_weight_path_env = os.path.join(data_dir, "finetune_model", "finetune_stage2_envtoken", "learned_embeds-steps-last.bin")
+    learned_embeds_env = torch.load(text_encoder_weight_path_env, map_location="cpu")["learned_embeds_dict"]
+
+    with torch.no_grad():
+        for token, embed in learned_embeds_env.items():
             token_id = tokenizer.convert_tokens_to_ids(token)
             # print(f"Loaded weight for token id {token_id}")
             token_embeds[token_id] = embed

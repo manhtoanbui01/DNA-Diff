@@ -51,7 +51,7 @@ def generate_translations(args, in_queue, out_queue, gpu_id):
         i_lists = []
         cam_names = []
         descriptions = []
-        env_descriptions = []
+        env_ids = []
         class_ids = []
         cond_embeds = []
         strengths = []
@@ -60,11 +60,11 @@ def generate_translations(args, in_queue, out_queue, gpu_id):
         for _ in range(batch_size):
             try:
                 # Now the queue items are (i_list, cam_name, desc, class_id, strength)
-                q_i_list, q_cam_name, q_desc, q_env_desc, q_class_id, q_cond_embed, q_strength = in_queue.get(timeout=1)
+                q_i_list, q_cam_name, q_desc, q_env_id, q_class_id, q_cond_embed, q_strength = in_queue.get(timeout=1)
                 i_lists.append(q_i_list)
                 cam_names.append(q_cam_name)
                 descriptions.append(q_desc)
-                env_descriptions.append(q_env_desc)
+                env_ids.append(q_env_id)
                 class_ids.append(q_class_id)
                 cond_embeds.append(q_cond_embed)
                 strengths.append(q_strength)
@@ -77,11 +77,11 @@ def generate_translations(args, in_queue, out_queue, gpu_id):
 
         # 2) Generate for each item in the batch
         results = []
-        for i_list, cam, desc, env_desc, nm, cond_embed, stg in zip(i_lists, cam_names, descriptions, env_descriptions, class_ids, cond_embeds, strengths):
+        for i_list, cam, desc, env_id, nm, cond_embed, stg in zip(i_lists, cam_names, descriptions, env_ids, class_ids, cond_embeds, strengths):
             metadata = {
                 "camera_name": cam,
                 "description": desc,
-                "environment_description": env_desc,
+                "env_id": env_id,
                 "class_id": nm,
                 "cond_embed": cond_embed,
             }
@@ -101,11 +101,11 @@ def generate_translations(args, in_queue, out_queue, gpu_id):
             )
 
             # Save results for later
-            results.append( (i_list, cam, desc, env_desc, nm, stg, out_images) )
+            results.append( (i_list, cam, desc, env_id, nm, stg, out_images) )
 
         # 3) Save images
         image_name = 0
-        for i_list, cam_name, desc, env_desc, nm, stg, image_list in results:
+        for i_list, cam_name, desc, env_id, nm, stg, image_list in results:
             # 'image_list' has len(i_list) images
             for single_i, pil_image in zip(i_list, image_list):
                 
@@ -186,7 +186,9 @@ def build_queue_via_metadata(
 
         cam_desc_str = camera_to_description[cam_name]
         possible_envs = [f'env{(int(cam_name[-1])-1) * 50 + i}' for i in range(1,51)]
-        env_desc_strs = [environment_to_description[env] for env in possible_envs]
+        # indices = list(range(1, 11)) + list(range(40, 51))
+        # base_offset = (int(cam_name[-1]) - 1) * 50
+        # possible_envs = [f'env{base_offset + i}' for i in indices]
         
 
         for class_id in all_class_ids:
@@ -210,8 +212,9 @@ def build_queue_via_metadata(
                 # Enqueue i_list (rather than a single i)
                 idx = torch.randint(0, embeds.shape[0], (1,))
                 cond_embed = embeds[idx].squeeze(0)
-                env_desc_str = random.choice(env_desc_strs)  # choose random environment
-                in_queue.put((i_list, cam_name, cam_desc_str, env_desc_str, class_id, cond_embed, strength))
+                # cond_embed = torch.zeros_like(embeds[idx].squeeze(0))
+                env_id = random.choice(possible_envs)  # choose random environment
+                in_queue.put((i_list, cam_name, cam_desc_str, env_id, class_id, cond_embed, strength))
 
             # Advance overall index_counter by 'repeat_each_id'
             index_counter += repeat_each_id

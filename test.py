@@ -12,9 +12,9 @@
 
 import torch
 
-path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501/finetune_model/lora_ti/learned_embeds-steps-25000.bin"
+path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage2_envtoken/learned_embeds-steps-last.bin"
 
-data = torch.load(path, map_location="cpu")["name2placeholder"]
+data = torch.load(path, map_location="cpu")["env2placeholder"]
 
 print("Type:", type(data))
 
@@ -27,6 +27,7 @@ if isinstance(data, dict):
         print(type(k))
         if i == 10:
             break
+    # print([key for key in data.keys()])
 
 # from datasets import load_from_disk
 

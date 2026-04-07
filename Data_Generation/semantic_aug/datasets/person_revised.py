@@ -400,6 +400,16 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
         self.use_placeholder = use_placeholder        
         self.name2placeholder = None
         self.placeholder2name = None
+
+        self.environment_names = sorted(
+            list(set(dataset['environment'])), 
+            key=lambda x: int(x.replace('env', ''))
+        )  # [env1, env2, ..., env301]
+        self.num_envs = len(self.environment_names)
+        
+        self.env2placeholder = None
+        self.placeholder2env = None        
+
         self.label_to_indices = defaultdict(list)
         for i, label in enumerate(self.dataset['label']):
             self.label_to_indices[label].append(i)
@@ -483,7 +493,7 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
 
         # (B) Access the textual description from the dataset
         domain_description = self.dataset[idx]['description'].strip()
-        environment_description = self.dataset[idx]['environment_description'].strip()
+        # environment = self.dataset[idx]['environment'].strip()
         
         
         path = f"{HUG_LOCAL_IMAGE_TRAIN_DIR.rstrip('/')}/finetune_model/finetune_stage1_dive/learned_embeds-steps-25000.bin"
@@ -494,11 +504,14 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
             # (C) Optionally get the placeholder name vs. direct class label
             content = self.name2placeholder[self.label2class[self.dataset[idx]['label']]]
 
-
+            # print(f'Person: {self.dataset[idx]["label"]}')
             # Append the "super_class_name" if you want, e.g. "person"
             content += " person"
             
-            environment = environment_description + " conditions"
+            environment = self.env2placeholder[self.dataset[idx]['environment']]
+            # print(f'Environment: {self.dataset[idx]["environment"]}')
+            
+            environment = environment + " conditions"
 
             # (D) Choose a template. Now each template has form "a {} photo of a {} in {}", etc.
             template = random.choice(IMAGENET_TEMPLATES_DIVE)
@@ -520,10 +533,19 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
 
     
 if __name__== '__main__':
-    ds = PersonHugDataset(examples_per_class=5)
-    save_dir = '/data/zhicai/code/Diff-Mix/data/5shot'
-    import tqdm
-    for i in tqdm.tqdm(range(len(ds))):
-        image = ds.get_image_by_idx(i)
-        image.save(os.path.join(save_dir,f'{i}.png'))
+    PLACEHOLDER_ENV_TEMPLATE = '<env_{}>'
+    train_dataset = PersonHugDatasetForT2I(image_train_dir='/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/')
+    placeholder_env_tokens = [PLACEHOLDER_ENV_TEMPLATE.format(i) for i in range(train_dataset.num_envs)]  #TEMPLATE '<env_{}>'
+    env2placeholder = {env: placeholder for env, placeholder in zip(train_dataset.environment_names, placeholder_env_tokens)}
+    placeholder2env = {placeholder: env for env, placeholder in zip(train_dataset.environment_names, placeholder_env_tokens)}
+    train_dataset.env2placeholder = env2placeholder
+    train_dataset.placeholder2env = placeholder2env
+    
+
+    
+    for i in range(30000):
+        if i < 29000:
+            continue
+        sample = train_dataset[i]
+        print(f"Prompt {i}: {sample['caption']}")
     
