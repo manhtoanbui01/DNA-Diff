@@ -62,87 +62,85 @@
 
 # compare 2 lora_ipadapter checkpoint file
 
-from safetensors.torch import load_file
-import torch
+# from safetensors.torch import load_file
+# import torch
 
-ckpt1_path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage3_ipadapter_real/checkpoint-25000/model.safetensors"
-ckpt2_path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage3_ipadapter/checkpoint-15000/model.safetensors"
+# ckpt1_path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage3_ipadapter_real/checkpoint-25000/model.safetensors"
+# ckpt2_path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage3_ipadapter/checkpoint-15000/model.safetensors"
 
-ckpt1 = load_file(ckpt1_path)
-ckpt2 = load_file(ckpt2_path)
+# ckpt1 = load_file(ckpt1_path)
+# ckpt2 = load_file(ckpt2_path)
 
-keys1 = set(ckpt1.keys())
-keys2 = set(ckpt2.keys())
+# keys1 = set(ckpt1.keys())
+# keys2 = set(ckpt2.keys())
 
-print("Only in ckpt1:", keys1 - keys2)
-print("Only in ckpt2:", keys2 - keys1)
-print("Common keys:", len(keys1 & keys2))
+# print("Only in ckpt1:", keys1 - keys2)
+# print("Only in ckpt2:", keys2 - keys1)
+# print("Common keys:", len(keys1 & keys2))
 
-# diffs = {}
+
+# stats = {}
 
 # for k in ckpt1.keys():
 #     if k in ckpt2:
-#         diff = torch.mean(torch.abs(ckpt1[k] - ckpt2[k])).item()
-#         diffs[k] = diff
+#         w1 = ckpt1[k]
+#         w2 = ckpt2[k]
 
-# # Sort by largest difference
-# sorted_diffs = sorted(diffs.items(), key=lambda x: x[1], reverse=True)
+#         mean1 = w1.mean().item()
+#         mean2 = w2.mean().item()
 
-# for k, v in sorted_diffs[:]:
-#     print(f"{k}: {v}")
+#         mean_diff = abs(mean1 - mean2)
+#         abs_diff = torch.mean(torch.abs(w1 - w2)).item()
 
-stats = {}
+#         # 🔥 percentage relative to ckpt1
+#         eps = 1e-8
+#         percent_mean_diff = mean_diff / (abs(mean1) + eps) * 100
+#         percent_abs_diff = abs_diff / (torch.mean(torch.abs(w1)).item() + eps) * 100
 
-for k in ckpt1.keys():
-    if k in ckpt2:
-        w1 = ckpt1[k]
-        w2 = ckpt2[k]
+#         stats[k] = {
+#             "mean1": mean1,
+#             "mean2": mean2,
+#             "mean_diff": mean_diff,
+#             "abs_diff": abs_diff,
+#             "percent_mean_diff": percent_mean_diff,
+#             "percent_abs_diff": percent_abs_diff,
+#         }
+# sorted_stats = sorted(stats.items(), key=lambda x: x[1]["percent_abs_diff"], reverse=True)
 
-        mean1 = w1.mean().item()
-        mean2 = w2.mean().item()
-        mean_diff = abs(mean1 - mean2)
-
-        abs_diff = torch.mean(torch.abs(w1 - w2)).item()
-
-        stats[k] = {
-            "mean1": mean1,
-            "mean2": mean2,
-            "mean_diff": mean_diff,
-            "abs_diff": abs_diff,
-        }
-
-# Sort by mean difference
-sorted_stats = sorted(stats.items(), key=lambda x: x[1]["mean_diff"], reverse=True)
-
-for k, v in sorted_stats:
-    print(f"{k}: mean1={v['mean1']:.6f}, mean2={v['mean2']:.6f}, "
-          f"mean_diff={v['mean_diff']:.6f}, abs_diff={v['abs_diff']:.6f}")
-    
+# for k, v in sorted_stats:
+#     print(
+#         f"{k}: "
+#         f"mean1={v['mean1']:.6f}, mean2={v['mean2']:.6f}, "
+#         f"mean_diff={v['mean_diff']:.6f}, "
+#         f"%mean_diff={v['percent_mean_diff']:.2f}%, "
+#         f"abs_diff={v['abs_diff']:.6f}, "
+#         f"%abs_diff={v['percent_abs_diff']:.2f}%"
+#     )
     
 # Compare 2 learned_embed_dict files:
 
-# import torch
+import torch
 
-# path1 = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage1_dive/learned_embeds-steps-5000.bin"
-# path2 = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage1_dive/learned_embeds-steps-15000.bin"
+path1 = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage2_envtoken/learned_embeds-steps-last.bin"
+path2 = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage3_ipadapter_50000_steps_test/learned_env_embeds-steps-500.bin"
 
-# embeds1 = torch.load(path1, map_location="cpu")["learned_embeds_dict"]
-# embeds2 = torch.load(path2, map_location="cpu")["learned_embeds_dict"]
+embeds1 = torch.load(path1, map_location="cpu")["learned_embeds_dict"]
+embeds2 = torch.load(path2, map_location="cpu")["learned_embeds_dict"]
 
-# keys1 = set(embeds1.keys())
-# keys2 = set(embeds2.keys())
+keys1 = set(embeds1.keys())
+keys2 = set(embeds2.keys())
 
-# print("Only in file1:", keys1 - keys2)
-# print("Only in file2:", keys2 - keys1)
-# print("Common tokens:", len(keys1 & keys2))
+print("Only in file1:", keys1 - keys2)
+print("Only in file2:", keys2 - keys1)
+print("Common tokens:", len(keys1 & keys2))
 
-# diffs = {}
+diffs = {}
 
-# for k in embeds1:
-#     if k in embeds2:
-#         diff = torch.mean(torch.abs(embeds1[k] - embeds2[k])).item()
-#         diffs[k] = diff
+for k in embeds1:
+    if k in embeds2:
+        diff = torch.mean(torch.abs(embeds1[k] - embeds2[k])).item()
+        diffs[k] = diff
 
-# # Top changed tokens
-# for k, v in sorted(diffs.items(), key=lambda x: x[1], reverse=True)[:100]:
-#     print(f"{k}: {v}")
+# Top changed tokens
+for k, v in sorted(diffs.items(), key=lambda x: x[1], reverse=True)[:1000]:
+    print(f"{k}: {v}")

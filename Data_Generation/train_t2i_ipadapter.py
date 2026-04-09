@@ -314,7 +314,7 @@ def parse_args():
     parser.add_argument(
         "--resume_from_checkpoint",
         type=str,
-        default=None,
+        default="latest",
         help=(
             "Whether training should be resumed from a previous checkpoint. Use a path saved by"
             ' `--checkpointing_steps`, or `"latest"` to automatically select the last available checkpoint.'
@@ -390,6 +390,33 @@ def extract_features(model, image_tensor):
     features = model(image_tensor)  # [B, D]
 
     return features
+
+
+def save_progress(text_encoder, placeholder_token_ids, accelerator, args, name2placeholder, placeholder2name, save_path):
+    logger.info("Saving embeddings")
+    learned_embeds = (
+        accelerator.unwrap_model(text_encoder)
+        .get_input_embeddings()
+        .weight[placeholder_token_ids]
+    )
+    learned_embeds_dict = {}
+    for learned_embed, (name, placeholder) in zip(learned_embeds, name2placeholder.items()):
+        learned_embeds_dict[placeholder] = learned_embed
+    
+    torch.save(dict(learned_embeds_dict = learned_embeds_dict, name2placeholder=name2placeholder, placeholder2name=placeholder2name), save_path)
+
+def save_progress_env(text_encoder, placeholder_env_ids, accelerator, args, env2placeholder, placeholder2env, save_path):
+    logger.info("Saving embeddings")
+    learned_embeds = (
+        accelerator.unwrap_model(text_encoder)
+        .get_input_embeddings()
+        .weight[placeholder_env_ids]
+    )
+    learned_embeds_dict = {}
+    for learned_embed, (env, placeholder) in zip(learned_embeds, env2placeholder.items()):
+        learned_embeds_dict[placeholder] = learned_embed
+    
+    torch.save(dict(learned_embeds_dict = learned_embeds_dict, env2placeholder=env2placeholder, placeholder2env=placeholder2env), save_path)
 
 
 def main():
@@ -934,19 +961,32 @@ def main():
                                     removing_checkpoint = os.path.join(args.output_dir, removing_checkpoint)
                                     shutil.rmtree(removing_checkpoint)
 
-                        # weight_name = (
-                        #     f"learned_embeds-steps-{global_step}.bin"
-                        # )
+                        weight_name = (
+                            f"learned_embeds-steps-{global_step}.bin"
+                        )
                         
-                        # save_progress(
-                        #     text_encoder,
-                        #     placeholder_token_ids,
-                        #     accelerator,
-                        #     args,
-                        #     name2placeholder=name2placeholder,
-                        #     placeholder2name=placeholder2name,      
-                        #     save_path = os.path.join(args.output_dir, weight_name),
-                        # )
+                        save_progress(
+                            text_encoder,
+                            placeholder_token_ids,
+                            accelerator,
+                            args,
+                            name2placeholder=name2placeholder,
+                            placeholder2name=placeholder2name,      
+                            save_path = os.path.join(args.output_dir, weight_name),
+                        )
+                        weight_env_name = (
+                            f"learned_env_embeds-steps-{global_step}.bin"
+                        )
+                        
+                        save_progress_env(
+                            text_encoder,
+                            placeholder_env_ids,
+                            accelerator,
+                            args,
+                            env2placeholder=env2placeholder,
+                            placeholder2env=placeholder2env,      
+                            save_path = os.path.join(args.output_dir, weight_env_name),
+                        )
                         save_path = os.path.join(args.output_dir, f"checkpoint-{global_step}")
                         accelerator.save_state(save_path)
                         logger.info(f"Saved state to {save_path}")

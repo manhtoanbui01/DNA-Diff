@@ -193,8 +193,8 @@ def build_queue_via_metadata(
         for class_id in all_class_ids:
             if int(class_id) <= threshold:
                 continue
-            if int(class_id) > 530:
-                continue
+            # if int(class_id) > 530:
+            #     continue
             # if class_id not in label2embed:
             #     continue
             label = class2label[class_id]
