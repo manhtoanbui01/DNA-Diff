@@ -35,10 +35,9 @@ data_dir = os.environ.get("HUG_LOCAL_IMAGE_TRAIN_DIR")
     
 def generate_translations(args, in_queue, out_queue, gpu_id):
     model = DreamboothLoraGeneration(
-        # checkpoint_path='/data4/toan/projects/DiVE/dataset/NightReID_DukeMTMC_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage3_ipadapter/checkpoint-25000/',
         checkpoint_path = os.path.join(data_dir, "finetune_model", "finetune_stage3_ipadapter", "checkpoint-15000"),
         model_path=args.model_path,
-        embed_path=os.path.join(data_dir, "finetune_model", "finetune_stage1_dive", "learned_embeds-steps-25000.bin"),
+        embed_path=os.path.join(data_dir, "finetune_model", "finetune_stage1_dive", "learned_embeds-steps-last.bin"),
         prompt=args.prompt,
         guidance_scale=args.guidance_scale,
         mask=args.mask,
@@ -156,7 +155,7 @@ def build_queue_via_metadata(
     # import pdb; pdb.set_trace()
     camera_to_description = dataset_obj.camera_to_description  # e.g. {"cam1": "ABCD1234", ...}                 # e.g. {0: "class_0", 1: "class_1", ...}
     class2label = dataset_obj.class2label 
-    environment_to_description = dataset_obj.environment_to_description
+    # environment_to_description = dataset_obj.environment_to_description
     # If user doesn't specify cameras, gather them from camera_to_description
     if not cameras:
         cameras = sorted(camera_to_description.keys())
@@ -193,6 +192,8 @@ def build_queue_via_metadata(
 
         for class_id in all_class_ids:
             if int(class_id) <= threshold:
+                continue
+            if int(class_id) > 530:
                 continue
             # if class_id not in label2embed:
             #     continue

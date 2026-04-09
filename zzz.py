@@ -79,5 +79,13 @@ index_no_updates[placeholder_env_ids] = False  # update placeholder_env_ids
 # print(f'Placeholder_env_ids: {placeholder_env_ids}')
 
 
-print(index_no_updates.sum())
-print(len(index_no_updates))
+# print(index_no_updates.sum())
+# print(len(index_no_updates))
+
+# print(tokenizer.decode([27215]))
+print(tokenizer.convert_ids_to_tokens(42170))
+
+token_id = tokenizer.convert_tokens_to_ids("lighting</w>")
+print(token_id)
+
+print(tokenizer.tokenize("conditions"))

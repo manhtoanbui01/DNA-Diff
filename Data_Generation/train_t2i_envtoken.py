@@ -786,6 +786,11 @@ def main():
 
     # keep original embeddings as reference
     orig_embeds_params = accelerator.unwrap_model(text_encoder).get_input_embeddings().weight.data.clone()
+    # embedding_layer = accelerator.unwrap_model(text_encoder).get_input_embeddings()
+    # len_tokenizer = embedding_layer.weight.shape[0]
+    # print(f"Length of tokenizer: {len_tokenizer}")
+    # not_updated_indices = torch.where(index_no_updates)[0]
+    # print("Not updated indices:", not_updated_indices)
     # import pdb;pdb.set_trace()
     for epoch in range(first_epoch, args.num_train_epochs):
         unet.train()

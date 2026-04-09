@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 from semantic_aug.datasets.person_revised import PersonHugDataset
-from semantic_aug.augmentations.dreabooth_lora_mt import DreamboothLoraGeneration
+from semantic_aug.augmentations.dreabooth_lora_mt_stage2 import DreamboothLoraGeneration
 
 from tqdm import tqdm
 from PIL import Image
@@ -36,7 +36,7 @@ data_dir = os.environ.get("HUG_LOCAL_IMAGE_TRAIN_DIR")
 def generate_translations(args, in_queue, out_queue, gpu_id):
     model = DreamboothLoraGeneration(
         # checkpoint_path='/data4/toan/projects/DiVE/dataset/NightReID_DukeMTMC_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage3_ipadapter/checkpoint-25000/',
-        checkpoint_path = os.path.join(data_dir, "finetune_model", "finetune_stage3_ipadapter", "checkpoint-15000"),
+        checkpoint_path = os.path.join(data_dir, "finetune_model", "finetune_stage2_envtoken", "checkpoint-10000"),
         model_path=args.model_path,
         embed_path=os.path.join(data_dir, "finetune_model", "finetune_stage1_dive", "learned_embeds-steps-25000.bin"),
         prompt=args.prompt,
@@ -178,6 +178,8 @@ def build_queue_via_metadata(
         possible_cond_embeds = osnet(possible_cond_image_paths)
         label2embed[label] = possible_cond_embeds
         
+    for cam_name in cameras:
+        print(f"cam_name: {cam_name}, cam_desc_str: {camera_to_description[cam_name]}")
 
     for cam_name in cameras:
         if cam_name not in camera_to_description:
@@ -185,15 +187,17 @@ def build_queue_via_metadata(
             continue
 
         cam_desc_str = camera_to_description[cam_name]
-        # possible_envs = [f'env{(int(cam_name[-1])-1) * 50 + i}' for i in range(1,51)]
-        indices = list(range(1, 11)) + list(range(40, 51))
-        base_offset = (int(cam_name[-1]) - 1) * 50
-        possible_envs = [f'env{base_offset + i}' for i in indices]
+        possible_envs = [f'env{(int(cam_name[-1])-1) * 50 + i}' for i in range(1,51)]
+        # indices = list(range(1, 11)) + list(range(40, 51))
+        # base_offset = (int(cam_name[-1]) - 1) * 50
+        # possible_envs = [f'env{base_offset + i}' for i in indices]
         
 
         for class_id in all_class_ids:
             if int(class_id) <= threshold:
                 continue
+            # if int(class_id) > 580:
+            #     continue
             # if class_id not in label2embed:
             #     continue
             label = class2label[class_id]

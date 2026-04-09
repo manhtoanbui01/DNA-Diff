@@ -53,7 +53,10 @@ def load_diffmix_embeddings(embed_path: str,
         # add the token in tokenizer
         num_added_tokens = tokenizer.add_tokens(token)
         assert num_added_tokens > 0, ERROR_MESSAGE.format(token=token)
-    
+        
+        # if token == "<class_7>":
+        #     print(f'Token: {token}, embedding: {token_embedding}')
+        
         # resize the token embeddings
         text_encoder.resize_token_embeddings(len(tokenizer))
         added_token_id = tokenizer.convert_tokens_to_ids(token)
@@ -64,6 +67,7 @@ def load_diffmix_embeddings(embed_path: str,
         # get the id for the token and assign new embeds
         embeddings.weight.data[added_token_id] = \
             token_embedding.to(embeddings.weight.dtype)
+        # print("Embedding weight dtype: ", embeddings.weight.dtype)
 
     return name2placeholder, placeholder2name
 
@@ -100,129 +104,129 @@ def load_diffmix_embeddings_env(embed_path: str,
 
     return env2placeholder, placeholder2env
 
-def identity(*args):
-    return args
+# def identity(*args):
+#     return args
 
-class IdentityMap:
-    def __getitem__(self, key):
-        return key
+# class IdentityMap:
+#     def __getitem__(self, key):
+#         return key
     
-class DreamboothLoraMixup(GenerativeMixup):
+# class DreamboothLoraMixup(GenerativeMixup):
 
-    pipe = None  # global sharing is a hack to avoid OOM
+#     pipe = None  # global sharing is a hack to avoid OOM
 
-    def __init__(self, lora_path: str, 
-                 model_path: str = "runwayml/stable-diffusion-v1-5",
-                 embed_path: str = None,
-                 prompt: str = "a photo of a {name}",
-                 format_name: Callable = format_name,
-                 guidance_scale: float = 7.5,
-                 mask: bool = False,
-                 inverted: bool = False,
-                 mask_grow_radius: int = 16,
-                 disable_safety_checker: bool = True,
-                 revision: str = None,
-                 device="cuda", 
-                 **kwargs):
+#     def __init__(self, lora_path: str, 
+#                  model_path: str = "runwayml/stable-diffusion-v1-5",
+#                  embed_path: str = None,
+#                  prompt: str = "a photo of a {name}",
+#                  format_name: Callable = format_name,
+#                  guidance_scale: float = 7.5,
+#                  mask: bool = False,
+#                  inverted: bool = False,
+#                  mask_grow_radius: int = 16,
+#                  disable_safety_checker: bool = True,
+#                  revision: str = None,
+#                  device="cuda", 
+#                  **kwargs):
 
-        super(DreamboothLoraMixup, self).__init__()
+#         super(DreamboothLoraMixup, self).__init__()
 
-        if DreamboothLoraMixup.pipe is None:
+#         if DreamboothLoraMixup.pipe is None:
 
-            PipelineClass = (StableDiffusionInpaintPipeline 
-                             if mask else 
-                             StableDiffusionImg2ImgPipeline)
+#             PipelineClass = (StableDiffusionInpaintPipeline 
+#                              if mask else 
+#                              StableDiffusionImg2ImgPipeline)
 
 
-            DreamboothLoraMixup.pipe = PipelineClass.from_pretrained(
-                model_path, use_auth_token=True,
-                revision=revision, 
-                local_files_only=True,
-                torch_dtype=torch.float16
-            ).to(device)
+#             DreamboothLoraMixup.pipe = PipelineClass.from_pretrained(
+#                 model_path, use_auth_token=True,
+#                 revision=revision, 
+#                 local_files_only=True,
+#                 torch_dtype=torch.float16
+#             ).to(device)
 
-            scheduler = DPMSolverMultistepScheduler.from_config(DreamboothLoraMixup.pipe.scheduler.config, local_files_only=True)
-            self.placeholder2name = None
-            self.name2placeholder = None
-            if embed_path is not None:
-                self.name2placeholder, self.placeholder2name = load_diffmix_embeddings(embed_path, DreamboothLoraMixup.pipe.text_encoder, DreamboothLoraMixup.pipe.tokenizer)
-            if lora_path is not None:
-                DreamboothLoraMixup.pipe.load_lora_weights(lora_path)
-            DreamboothLoraMixup.pipe.scheduler = scheduler
+#             scheduler = DPMSolverMultistepScheduler.from_config(DreamboothLoraMixup.pipe.scheduler.config, local_files_only=True)
+#             self.placeholder2name = None
+#             self.name2placeholder = None
+#             if embed_path is not None:
+#                 self.name2placeholder, self.placeholder2name = load_diffmix_embeddings(embed_path, DreamboothLoraMixup.pipe.text_encoder, DreamboothLoraMixup.pipe.tokenizer)
+#             if lora_path is not None:
+#                 DreamboothLoraMixup.pipe.load_lora_weights(lora_path)
+#             DreamboothLoraMixup.pipe.scheduler = scheduler
  
-            print(f"successfuly load lora weights from {lora_path}! ! ! ")
+#             print(f"successfuly load lora weights from {lora_path}! ! ! ")
 
-            logging.disable_progress_bar()
-            self.pipe.set_progress_bar_config(disable=True)
+#             logging.disable_progress_bar()
+#             self.pipe.set_progress_bar_config(disable=True)
 
-            if disable_safety_checker:
-                self.pipe.safety_checker = None
+#             if disable_safety_checker:
+#                 self.pipe.safety_checker = None
 
-        self.prompt = prompt
-        self.guidance_scale = guidance_scale
-        self.format_name = format_name
+#         self.prompt = prompt
+#         self.guidance_scale = guidance_scale
+#         self.format_name = format_name
 
-        self.mask = mask
-        self.inverted = inverted
-        self.mask_grow_radius = mask_grow_radius
+#         self.mask = mask
+#         self.inverted = inverted
+#         self.mask_grow_radius = mask_grow_radius
 
-        self.erasure_word_name = None
+#         self.erasure_word_name = None
 
-    def forward(self, image: Image.Image, label: int, 
-                metadata: dict, strength: float=0.5, resolution=512) -> Tuple[Image.Image, int]:
+#     def forward(self, image: Image.Image, label: int, 
+#                 metadata: dict, strength: float=0.5, resolution=512) -> Tuple[Image.Image, int]:
 
-        canvas = [img.resize((resolution, resolution), Image.BILINEAR) for img in image]
-        name = metadata.get("name", "") 
+#         canvas = [img.resize((resolution, resolution), Image.BILINEAR) for img in image]
+#         name = metadata.get("name", "") 
 
-        if self.name2placeholder is not None:
-            name = self.name2placeholder[name] 
-        if metadata.get("super_class", None) is not None:
-            name  = name + ' ' + metadata.get("super_class", "")
-        prompt = self.prompt.format(name=name)
+#         if self.name2placeholder is not None:
+#             name = self.name2placeholder[name] 
+#         if metadata.get("super_class", None) is not None:
+#             name  = name + ' ' + metadata.get("super_class", "")
+#         prompt = self.prompt.format(name=name)
 
-        print(prompt)
+#         print(prompt)
 
-        if self.mask: assert "mask" in metadata, \
-            "mask=True but no mask present in metadata"
+#         if self.mask: assert "mask" in metadata, \
+#             "mask=True but no mask present in metadata"
         
-        # word_name = metadata.get("name", "").replace(" ", "")
+#         # word_name = metadata.get("name", "").replace(" ", "")
 
-        kwargs = dict(
-            image=canvas,
-            prompt=[prompt], 
-            strength=strength, 
-            guidance_scale=self.guidance_scale,
-            num_inference_steps=25,
-            num_images_per_prompt=len(canvas)
-        )
+#         kwargs = dict(
+#             image=canvas,
+#             prompt=[prompt], 
+#             strength=strength, 
+#             guidance_scale=self.guidance_scale,
+#             num_inference_steps=25,
+#             num_images_per_prompt=len(canvas)
+#         )
         
-        if self.mask:  # use focal object mask
-            mask_image = metadata["mask"].resize((resolution, resolution), Image.NEAREST)
+#         if self.mask:  # use focal object mask
+#             mask_image = metadata["mask"].resize((resolution, resolution), Image.NEAREST)
 
-            mask_image = Image.fromarray(
-                maximum_filter(np.array(mask_image), 
-                               size=self.mask_grow_radius))
+#             mask_image = Image.fromarray(
+#                 maximum_filter(np.array(mask_image), 
+#                                size=self.mask_grow_radius))
 
-            if self.inverted:
+#             if self.inverted:
 
-                mask_image = ImageOps.invert(
-                    mask_image.convert('L')).convert('1')
+#                 mask_image = ImageOps.invert(
+#                     mask_image.convert('L')).convert('1')
 
-            kwargs["mask_image"] = mask_image
+#             kwargs["mask_image"] = mask_image
 
-        has_nsfw_concept = True
-        while has_nsfw_concept:
-            with autocast("cuda"):
-                outputs = self.pipe(**kwargs)
+#         has_nsfw_concept = True
+#         while has_nsfw_concept:
+#             with autocast("cuda"):
+#                 outputs = self.pipe(**kwargs)
 
-            has_nsfw_concept = (
-                self.pipe.safety_checker is not None 
-                and outputs.nsfw_content_detected[0]
-            )
-        canvas = []
-        for orig, out in zip(image, outputs.images):
-            canvas.append(out.resize(orig.size, Image.BILINEAR))
-        return canvas, label
+#             has_nsfw_concept = (
+#                 self.pipe.safety_checker is not None 
+#                 and outputs.nsfw_content_detected[0]
+#             )
+#         canvas = []
+#         for orig, out in zip(image, outputs.images):
+#             canvas.append(out.resize(orig.size, Image.BILINEAR))
+#         return canvas, label
 
 
 class DreamboothLoraGeneration(GenerativeMixup):
@@ -262,8 +266,16 @@ class DreamboothLoraGeneration(GenerativeMixup):
             # embed_path = os.path.join(os.path.dirname(os.path.normpath(checkpoint_path)), f'learned_embeds-steps-last.bin')
             # embed_path = "/data4/toan/projects/DiVE/dataset/NightReID_DukeMTMC_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage1_dive/learned_embeds-steps-last.bin"
             self.name2placeholder, self.placeholder2name = load_diffmix_embeddings(embed_path, DreamboothLoraGeneration.pipe.text_encoder, DreamboothLoraGeneration.pipe.tokenizer)
-            embed_path_env = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage2_envtoken/learned_embeds-steps-last.bin"
+            data_dir = os.environ.get("HUG_LOCAL_IMAGE_TRAIN_DIR")
+            embed_path_env = os.path.join(data_dir, 'finetune_model', 'finetune_stage2_envtoken', 'learned_embeds-steps-last.bin')
             self.env2placeholder, self.placeholder2env = load_diffmix_embeddings_env(embed_path_env, DreamboothLoraGeneration.pipe.text_encoder, DreamboothLoraGeneration.pipe.tokenizer)
+            
+            # embedding_layer = DreamboothLoraGeneration.pipe.text_encoder.get_input_embeddings()
+            # token_id = DreamboothLoraGeneration.pipe.tokenizer.convert_tokens_to_ids("<env_7>")
+            # embedding = embedding_layer.weight[token_id]
+
+            # print("Token ID:", token_id)
+            # print("Embedding shape:", embedding)
             
             unet = DreamboothLoraGeneration.pipe.unet
             lora_ipadapter_attn_procs = {}
@@ -371,6 +383,7 @@ class DreamboothLoraGeneration(GenerativeMixup):
             env_id = self.env2placeholder.get(env_id, env_id)
         env_id += " conditions"
         # Single prompt string
+        name = "person"
         prompt_str = self.prompt.format(name=name, description=desc, conditions=env_id)
         print("Using prompt:", prompt_str)
         

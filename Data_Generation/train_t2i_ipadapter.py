@@ -548,7 +548,7 @@ def main():
     with torch.no_grad():
         for token, embed in learned_embeds.items():
             token_id = tokenizer.convert_tokens_to_ids(token)
-            # print(f"Loaded weight for token id {token_id}")
+            # print(f"Load token {token} has id {token_id}")
             token_embeds[token_id] = embed
 
     text_encoder_weight_path_env = os.path.join(data_dir, "finetune_model", "finetune_stage2_envtoken", "learned_embeds-steps-last.bin")
@@ -557,13 +557,19 @@ def main():
     with torch.no_grad():
         for token, embed in learned_embeds_env.items():
             token_id = tokenizer.convert_tokens_to_ids(token)
-            # print(f"Loaded weight for token id {token_id}")
+            # print(f"Load token {token} has id {token_id}")
             token_embeds[token_id] = embed
 
     # 5. Freeze entire text encoder
     text_encoder.requires_grad_(False)
     text_encoder.eval()
     
+    # embedding_layer = text_encoder.get_input_embeddings()
+    # token_id = tokenizer.convert_tokens_to_ids("<class_7>")
+    # embedding = embedding_layer.weight[token_id]
+
+    # print("Token ID:", token_id)
+    # print("Embedding shape:", embedding)
 
 
     # Set correct lora layers
@@ -594,7 +600,7 @@ def main():
             
     unet.set_attn_processor(lora_ipadapter_attn_procs)
     
-    # Load stage 1 LoRA weight
+    # Load stage 2 Env_Token weight
     from safetensors.torch import load_file
     # ckpt_path = "/data4/toan/projects/DiVE/dataset/NightReID_DukeMTMC_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage2_envtoken/checkpoint-10000/model.safetensors"
     ckpt_path = os.path.join(data_dir, "finetune_model", "finetune_stage2_envtoken", "checkpoint-10000", "model.safetensors")
@@ -718,6 +724,12 @@ def main():
         cond_pixel_values = torch.stack([example["cond_pixel_values"] for example in examples])
         cond_pixel_values = cond_pixel_values.to(memory_format=torch.contiguous_format).float()
         input_ids = tokenize_captions(examples) #'a jCmLmYM5 photo of a <class_599> person'
+        
+        # tokens = tokenizer.convert_ids_to_tokens(input_ids[0])
+        # print(tokens)
+        # print(f"input_ids: {input_ids}")
+        
+        # print(f'input_ids: {input_ids.tolist()}')
         # input_ids = torch.stack([example["input_ids"] for example in input_ids])
         return {"pixel_values": pixel_values, "cond_pixel_values": cond_pixel_values, "input_ids": input_ids}
 
