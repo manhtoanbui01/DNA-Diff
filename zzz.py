@@ -83,9 +83,13 @@ index_no_updates[placeholder_env_ids] = False  # update placeholder_env_ids
 # print(len(index_no_updates))
 
 # print(tokenizer.decode([27215]))
-print(tokenizer.convert_ids_to_tokens(42170))
+# print(tokenizer.convert_ids_to_tokens(42170))
 
-token_id = tokenizer.convert_tokens_to_ids("lighting</w>")
-print(token_id)
+# token_id = tokenizer.convert_tokens_to_ids("lighting</w>")
+# print(token_id)
 
-print(tokenizer.tokenize("conditions"))
+print(tokenizer.tokenize("E4KL"))
+
+# ids = tokenizer("a bUgJ photo of a <class_500> person")["input_ids"]
+ids = tokenizer("bUgJ")["input_ids"]
+print(ids)

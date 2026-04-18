@@ -1,7 +1,7 @@
 #!/bin/bash
 
-GPU_IDS=1,2,3,4,5,6,7
-# GPU_IDS=7
+GPU_IDS=1,2,3
+# GPU_IDS=0
 
 
 # echo "===== Step 1 ====="
@@ -10,22 +10,22 @@ GPU_IDS=1,2,3,4,5,6,7
 #     CUDA_VISIBLE_DEVICES=$GPU_IDS finetune
 # ) && \
 
-echo "===== Step 2 ====="
-(
-    source scripts/finetune_step2.sh
-    CUDA_VISIBLE_DEVICES=$GPU_IDS finetune
-) && \
+# echo "===== Step 2 ====="
+# (
+#     source scripts/finetune_step2.sh
+#     CUDA_VISIBLE_DEVICES=$GPU_IDS finetune
+# ) && \
 
 echo "===== Step 3 ====="
 (
     source scripts/finetune_step3.sh
-    CUDA_VISIBLE_DEVICES=$GPU_IDS finetune
-) && \
+    CUDA_VISIBLE_DEVICES=$GPU_IDS finetune)
+# ) && \
 
-echo "===== Inference ====="
-(
-    source scripts/sample.sh
-    CUDA_VISIBLE_DEVICES=$GPU_IDS sample
-)
+# echo "===== Inference ====="
+# (
+#     source scripts/sample.sh
+#     CUDA_VISIBLE_DEVICES=$GPU_IDS sample
+# )
 
-echo "===== All steps completed ====="
+# echo "===== All steps completed ====="

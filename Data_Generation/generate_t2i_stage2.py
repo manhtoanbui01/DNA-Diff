@@ -35,16 +35,16 @@ data_dir = os.environ.get("HUG_LOCAL_IMAGE_TRAIN_DIR")
     
 def generate_translations(args, in_queue, out_queue, gpu_id):
     model = DreamboothLoraGeneration(
-        # checkpoint_path='/data4/toan/projects/DiVE/dataset/NightReID_DukeMTMC_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage3_ipadapter/checkpoint-25000/',
-        checkpoint_path = os.path.join(data_dir, "finetune_model", "finetune_stage2_envtoken", "checkpoint-10000"),
+        checkpoint_path = os.path.join(data_dir, "finetune_model", "finetune_stage2_envtoken", "checkpoint-20000"),
         model_path=args.model_path,
-        embed_path=os.path.join(data_dir, "finetune_model", "finetune_stage1_dive", "learned_embeds-steps-25000.bin"),
+        embed_path=os.path.join(data_dir, "finetune_model", "finetune_stage1_dive", "learned_embeds-steps-last.bin"),
         prompt=args.prompt,
         guidance_scale=args.guidance_scale,
         mask=args.mask,
         inverted=args.inverted,
         device=f'cuda:{gpu_id}'
     )
+
     batch_size = args.batch_size
 
     while True:
@@ -115,7 +115,7 @@ def generate_translations(args, in_queue, out_queue, gpu_id):
                 os.makedirs(subfolder, exist_ok=True)
 
             for local_idx, pil_image in enumerate(image_list, start=1):
-                filename = f"{image_name}.jpg"
+                filename = f"{image_name}_{env_id}.jpg"
                 save_path = os.path.join(subfolder, filename)
                 pil_image.save(save_path)
                 print(f"Saved {save_path}")
@@ -171,12 +171,12 @@ def build_queue_via_metadata(
     
     # cond_market1501_path = "/data4/toan/projects/DiVE/dataset/NightReID_DukeMTMC_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/cam7/env301"
     cond_market1501_path = os.path.join(data_dir, "cam7", "env301")
-    label2embed = {}
-    for identity in os.listdir(cond_market1501_path):
-        label = class2label[str(int(identity))]
-        possible_cond_image_paths = [os.path.join(cond_market1501_path, identity, image) for image in os.listdir(os.path.join(cond_market1501_path, identity))]
-        possible_cond_embeds = osnet(possible_cond_image_paths)
-        label2embed[label] = possible_cond_embeds
+    # label2embed = {}
+    # for identity in os.listdir(cond_market1501_path):
+    #     label = class2label[str(int(identity))]
+    #     possible_cond_image_paths = [os.path.join(cond_market1501_path, identity, image) for image in os.listdir(os.path.join(cond_market1501_path, identity))]
+    #     possible_cond_embeds = osnet(possible_cond_image_paths)
+    #     label2embed[label] = possible_cond_embeds
         
     for cam_name in cameras:
         print(f"cam_name: {cam_name}, cam_desc_str: {camera_to_description[cam_name]}")
@@ -196,12 +196,14 @@ def build_queue_via_metadata(
         for class_id in all_class_ids:
             if int(class_id) <= threshold:
                 continue
-            # if int(class_id) > 580:
+            if cam_name == "cam1" and int(class_id) < 1081:
+                continue
+            # if int(class_id) > 530:
             #     continue
             # if class_id not in label2embed:
             #     continue
             label = class2label[class_id]
-            embeds = label2embed[label]
+            # embeds = label2embed[label]
             
 
             start_i = index_counter
@@ -214,8 +216,8 @@ def build_queue_via_metadata(
                 i_list = list(range(chunk_start, chunk_end))
 
                 # Enqueue i_list (rather than a single i)
-                idx = torch.randint(0, embeds.shape[0], (1,))
-                cond_embed = embeds[idx].squeeze(0)
+                # idx = torch.randint(0, embeds.shape[0], (1,))
+                cond_embed = None
                 env_id = random.choice(possible_envs)  # choose random environment
                 in_queue.put((i_list, cam_name, cam_desc_str, env_id, class_id, cond_embed, strength))
 
@@ -314,7 +316,7 @@ if __name__ == "__main__":
     parser.add_argument("--examples_per_class", type=int, default=-1, help="Number of examples per class (if applicable).")
     parser.add_argument("--resolution", type=int, default=512, help="Image resolution.")
     parser.add_argument("--batch_size", type=int, default=1, help="Batch size for generation.")
-    parser.add_argument("--prompt", type=str, default="a {description} photo of a {name} in {conditions}", help="Base prompt string.")
+    parser.add_argument("--prompt", type=str, default="a {conditions} photo of a {name}", help="Base prompt string.")
     parser.add_argument("--mask", type=int, default=0, choices=[0, 1], help="Whether to apply a mask (0=no, 1=yes).")
     parser.add_argument("--inverted", type=int, default=0, choices=[0, 1], help="Whether to invert the mask (0=no, 1=yes).")
     parser.add_argument("--gpu_ids", type=int, nargs="+", default=[0], help="List of GPU IDs to use.")

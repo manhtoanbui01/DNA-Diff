@@ -11,7 +11,7 @@ import json
 def move_synthetic_data(synthetic_dir, target_dir, ipc: int = 3):  # ipc: numbers of images per camera per identity
     for cam in os.listdir(synthetic_dir):
         cam_name = cam[-1]
-        # if cam_name != "6":
+        # if cam_name != "3":
         #     continue
         for id in os.listdir(os.path.join(synthetic_dir, cam)):
             real_id = str(int(id)+10000)

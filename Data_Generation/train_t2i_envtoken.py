@@ -61,7 +61,7 @@ from semantic_aug.datasets.person_revised import PersonHugDatasetForT2I
 logger = get_logger(__name__, log_level="INFO")
 
 PLACEHOLDER_TOKEN_TEMPLATE = '<class_{}>'
-PLACEHOLDER_ENV_TEMPLATE = '<env_{}>'
+PLACEHOLDER_ENV_TEMPLATE = '<env_{}_{}>'
 INITIALIZER_TOKEN = 42170
 INITIALIZER_ENV_TOKEN = 42171
 
@@ -484,6 +484,7 @@ def main():
     with accelerator.main_process_first():        
         train_dataset = PersonHugDatasetForT2I(seed = args.seed,
                                     max_train_samples=args.max_train_samples,
+                                    class_prompts_ratio=0.5,  # 50% using env_token only
                                     center_crop = args.center_crop,
                                     resolution = (512, 256),#args.resolution,
                                     random_flip = args.random_flip,
@@ -529,9 +530,25 @@ def main():
             # print(f"Loaded weight for token id {token_id}")
             token_embeds[token_id] = embed
     
-    placeholder_env_tokens = [PLACEHOLDER_ENV_TEMPLATE.format(i) for i in range(train_dataset.num_envs)]  #TEMPLATE '<env_{}>'
-    env2placeholder = {env: placeholder for env, placeholder in zip(train_dataset.environment_names, placeholder_env_tokens)}
-    placeholder2env = {placeholder: env for env, placeholder in zip(train_dataset.environment_names, placeholder_env_tokens)}
+    camera_to_description = {'cam7': 'Suqf', 'cam1': 'O1ek', 'cam2': 'lATC', 'cam3': 'p65Y', 'cam4': 'bUgJ', 'cam5': 'wnQW', 'cam6': 'E4KL'}
+    cam_to_token_ids = {}
+
+    for cam in camera_to_description:
+        ids = tokenizer(camera_to_description[cam])["input_ids"][1:-1]  # remove the begining and ending tokens
+        cam_to_token_ids[cam] = ids
+    
+    
+    environment_names = train_dataset.environment_names
+    placeholder_env_tokens = []
+    env2placeholder = {}
+    for environment_name in environment_names:
+        env = int(environment_name[3:-2])
+        token_order = int(environment_name[-1])
+        placeholder_env_token = PLACEHOLDER_ENV_TEMPLATE.format(env, token_order)
+        placeholder_env_tokens.append(placeholder_env_token)
+        env2placeholder[environment_name] = placeholder_env_token
+    # print(f'placeholder_env_tokens: {placeholder_env_tokens}')
+    placeholder2env = {placeholder: env for env, placeholder in env2placeholder.items()}
     train_dataset.env2placeholder = env2placeholder
     train_dataset.placeholder2env = placeholder2env
     # import pdb;pdb.set_trace()
@@ -546,14 +563,23 @@ def main():
     # Initialise the newly added placeholder token with the embeddings of the initializer token
     text_encoder.resize_token_embeddings(len(tokenizer)) # [49408, 768]->[50814, 768]
     token_embeds = text_encoder.get_input_embeddings().weight.data #[50814, 768]
-    initializer_env_id = INITIALIZER_ENV_TOKEN #42171
+    # initializer_env_id = INITIALIZER_ENV_TOKEN #42171
     placeholder_env_ids = tokenizer.convert_tokens_to_ids(placeholder_env_tokens) #49408, 49409, 49410, 49411, 49412 ... 496607 #正常的embedding到49407结束
+    placeholder_env_ids2tokens = {placeholder_env_id:placeholder_env_token for placeholder_env_id, placeholder_env_token in zip(placeholder_env_ids, placeholder_env_tokens)}
     with torch.no_grad(): #placeholder_tokens ['<env_0>', ...'<env_299>', '<env_300>']
         for token_id in placeholder_env_ids:
-            token_embeds[token_id] = token_embeds[initializer_env_id].clone() #把newly added token 赋予INITIALIZER_TOKEN对应的embedding的值
+            env_token = placeholder_env_ids2tokens[token_id]  # ['<env_1_1>', ...'<env_301_1>', '<env_301_2>']
+            env = int(env_token.split('_')[1])
+            cam = f'cam{(env - 1) // 50 + 1}'
+            token_order = int(env_token.strip('<>').split('_')[2])
+            initial_id = cam_to_token_ids[cam][token_order-1]
+            token_embeds[token_id] = token_embeds[initial_id].clone() 
+            # print(f"Load token id {token_id} for token {env_token}, initial with token id {initial_id}")
             
     index_no_updates = torch.ones((len(tokenizer),), dtype=torch.bool) #[49608] # no update tokens
     index_no_updates[placeholder_env_ids] = False  # update placeholder_env_ids
+    
+    # print(f'placeholder_env_ids: {placeholder_env_ids}')
 
 
     # Set correct lora layers

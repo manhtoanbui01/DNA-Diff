@@ -35,7 +35,7 @@ data_dir = os.environ.get("HUG_LOCAL_IMAGE_TRAIN_DIR")
     
 def generate_translations(args, in_queue, out_queue, gpu_id):
     model = DreamboothLoraGeneration(
-        checkpoint_path = os.path.join(data_dir, "finetune_model", "finetune_stage3_ipadapter", "checkpoint-15000"),
+        checkpoint_path = os.path.join(data_dir, "finetune_model", "finetune_stage3_ipadapter_50000_steps", "checkpoint-20000"),
         model_path=args.model_path,
         embed_path=os.path.join(data_dir, "finetune_model", "finetune_stage1_dive", "learned_embeds-steps-last.bin"),
         prompt=args.prompt,
@@ -114,7 +114,7 @@ def generate_translations(args, in_queue, out_queue, gpu_id):
                 os.makedirs(subfolder, exist_ok=True)
 
             for local_idx, pil_image in enumerate(image_list, start=1):
-                filename = f"{image_name}.jpg"
+                filename = f"{image_name}_{env_id}.jpg"
                 save_path = os.path.join(subfolder, filename)
                 pil_image.save(save_path)
                 print(f"Saved {save_path}")
@@ -193,7 +193,7 @@ def build_queue_via_metadata(
         for class_id in all_class_ids:
             if int(class_id) <= threshold:
                 continue
-            # if int(class_id) > 530:
+            # if cam_name == "cam1" and int(class_id) < 1561:
             #     continue
             # if class_id not in label2embed:
             #     continue
@@ -213,7 +213,6 @@ def build_queue_via_metadata(
                 # Enqueue i_list (rather than a single i)
                 idx = torch.randint(0, embeds.shape[0], (1,))
                 cond_embed = embeds[idx].squeeze(0)
-                # cond_embed = torch.zeros_like(embeds[idx].squeeze(0))
                 env_id = random.choice(possible_envs)  # choose random environment
                 in_queue.put((i_list, cam_name, cam_desc_str, env_id, class_id, cond_embed, strength))
 
@@ -312,7 +311,7 @@ if __name__ == "__main__":
     parser.add_argument("--examples_per_class", type=int, default=-1, help="Number of examples per class (if applicable).")
     parser.add_argument("--resolution", type=int, default=512, help="Image resolution.")
     parser.add_argument("--batch_size", type=int, default=1, help="Batch size for generation.")
-    parser.add_argument("--prompt", type=str, default="a {description} photo of a {name} in {conditions}", help="Base prompt string.")
+    parser.add_argument("--prompt", type=str, default="a {conditions} photo of a {name}", help="Base prompt string.")
     parser.add_argument("--mask", type=int, default=0, choices=[0, 1], help="Whether to apply a mask (0=no, 1=yes).")
     parser.add_argument("--inverted", type=int, default=0, choices=[0, 1], help="Whether to invert the mask (0=no, 1=yes).")
     parser.add_argument("--gpu_ids", type=int, nargs="+", default=[0], help="List of GPU IDs to use.")

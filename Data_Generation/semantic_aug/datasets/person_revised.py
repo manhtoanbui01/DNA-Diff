@@ -23,7 +23,8 @@ SUPER_CLASS_NAME = 'person'
 # HUG_LOCAL_IMAGE_TRAIN_DIR = "/root/autodl-tmp/process_sysu/person_sysu_market_ca_12_1011"
 HUG_LOCAL_IMAGE_TEST_DIR = "/root" #not used, doesn't matter
 
-HUG_LOCAL_IMAGE_TRAIN_DIR = os.getenv("HUG_LOCAL_IMAGE_TRAIN_DIR")
+# HUG_LOCAL_IMAGE_TRAIN_DIR = os.getenv("HUG_LOCAL_IMAGE_TRAIN_DIR")
+HUG_LOCAL_IMAGE_TRAIN_DIR = '/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/'
 if HUG_LOCAL_IMAGE_TRAIN_DIR is None:
     raise ValueError("HUG_LOCAL_IMAGE_TRAIN_DIR env variable is not set.")
 
@@ -394,17 +395,27 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
         self.class_names = [name.replace('/',' ') for name in dataset.features['label'].names]
         self.dataset = dataset
         self.class2label = self.dataset.features['label']._str2int
-        self.label2class = {v: k for k, v in self.class2label.items()} 
+        self.label2class = {v: k for k, v in self.class2label.items()}
         self.num_classes = len(self.class_names)
         self.class_prompts_ratio = class_prompts_ratio
         self.use_placeholder = use_placeholder        
         self.name2placeholder = None
         self.placeholder2name = None
+        
+        self.cam_to_num_tokens = {'cam7': 2, 'cam1': 3, 'cam2': 2, 'cam3': 4, 'cam4': 2, 'cam5': 3, 'cam6': 3}  # the number of tokens for each chosen camera token
 
-        self.environment_names = sorted(
+        self.env_names = sorted(
             list(set(dataset['environment'])), 
             key=lambda x: int(x.replace('env', ''))
         )  # [env1, env2, ..., env301]
+        
+        self.environment_names = []
+        for env_name in self.env_names:
+            cam = f'cam{(int(env_name[3:])-1) // 50 + 1}'
+            num_tokens = self.cam_to_num_tokens[cam]
+            for i in range(1, num_tokens+1):
+                self.environment_names.append(f'{env_name}_{i}')
+        
         self.num_envs = len(self.environment_names)
         
         self.env2placeholder = None
@@ -492,7 +503,7 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
         flag = random.random() < self.class_prompts_ratio
 
         # (B) Access the textual description from the dataset
-        domain_description = self.dataset[idx]['description'].strip()
+        # domain_description = self.dataset[idx]['description'].strip()
         # environment = self.dataset[idx]['environment'].strip()
         
         
@@ -508,22 +519,37 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
             # Append the "super_class_name" if you want, e.g. "person"
             content += " person"
             
-            environment = self.env2placeholder[self.dataset[idx]['environment']]
-            # print(f'Environment: {self.dataset[idx]["environment"]}')
-            
-            environment = environment + " conditions"
+            # environment = self.env2placeholder[self.dataset[idx]['environment']]
+            environment = self.dataset[idx]['environment']
+            cam = f'cam{(int(environment[3:])-1) // 50 + 1}'
+            num_tokens = self.cam_to_num_tokens[cam]
+            domain_description = ""
+            for i in range(1, num_tokens+1):
+                if i == num_tokens:
+                    env_token = f"<env_{environment[3:]}_{i}>"
+                else:
+                    env_token = f"<env_{environment[3:]}_{i}> "
+                domain_description += env_token
+        
 
-            # (D) Choose a template. Now each template has form "a {} photo of a {} in {}", etc.
-            template = random.choice(IMAGENET_TEMPLATES_DIVE)
+            # (D) Choose a template. Now each template has form "a {} photo of a {}", etc.
+            template = random.choice(IMAGENET_TEMPLATES_DIVE_STEP1)
 
-            prompt = template.format(domain_description, content, environment)
+            prompt = template.format(domain_description, content)
             
             # print(f'Using caption: {prompt}')
         else:
-            # If not using the "class prompt" approach, pick a random line from description
-            # e.g. in case the user's 'description' has multiple lines
-            lines = domain_description.split('\n')
-            prompt = random.choice(lines) if lines else domain_description
+            environment = self.dataset[idx]['environment']
+            cam = f'cam{(int(environment[3:])-1) // 50 + 1}'
+            num_tokens = self.cam_to_num_tokens[cam]
+            domain_description = ""
+            for i in range(1, num_tokens+1):
+                if i == num_tokens:
+                    env_token = f"<env_{environment[3:]}_{i}>"
+                else:
+                    env_token = f"<env_{environment[3:]}_{i}> "
+                domain_description += env_token
+            prompt = domain_description
 
         return prompt
 
@@ -533,18 +559,26 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
 
     
 if __name__== '__main__':
-    PLACEHOLDER_ENV_TEMPLATE = '<env_{}>'
-    train_dataset = PersonHugDatasetForT2I(image_train_dir='/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/')
-    placeholder_env_tokens = [PLACEHOLDER_ENV_TEMPLATE.format(i) for i in range(train_dataset.num_envs)]  #TEMPLATE '<env_{}>'
-    env2placeholder = {env: placeholder for env, placeholder in zip(train_dataset.environment_names, placeholder_env_tokens)}
-    placeholder2env = {placeholder: env for env, placeholder in zip(train_dataset.environment_names, placeholder_env_tokens)}
+    PLACEHOLDER_ENV_TEMPLATE = '<env_{}_{}>'
+    # HUG_LOCAL_IMAGE_TRAIN_DIR = '/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/'
+    train_dataset = PersonHugDatasetForT2I(class_prompts_ratio=0.5)
+    environment_names = train_dataset.environment_names
+    placeholder_env_tokens = []
+    env2placeholder = {}
+    for environment_name in environment_names:
+        env = int(environment_name[3:-2])
+        token_order = int(environment_name[-1])
+        placeholder_env_token = PLACEHOLDER_ENV_TEMPLATE.format(env, token_order)
+        placeholder_env_tokens.append(placeholder_env_token)
+        env2placeholder[environment_name] = placeholder_env_token
+    placeholder2env = {placeholder: env for env, placeholder in env2placeholder.items()}
     train_dataset.env2placeholder = env2placeholder
     train_dataset.placeholder2env = placeholder2env
     
 
     
-    for i in range(30000):
-        if i < 29000:
+    for i in range(37000):
+        if i < 36000:
             continue
         sample = train_dataset[i]
         print(f"Prompt {i}: {sample['caption']}")

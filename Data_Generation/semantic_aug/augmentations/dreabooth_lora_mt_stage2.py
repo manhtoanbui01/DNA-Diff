@@ -145,12 +145,12 @@ class DreamboothLoraGeneration(GenerativeMixup):
             embed_path_env = os.path.join(data_dir, 'finetune_model', 'finetune_stage2_envtoken', 'learned_embeds-steps-last.bin')
             self.env2placeholder, self.placeholder2env = load_diffmix_embeddings_env(embed_path_env, DreamboothLoraGeneration.pipe.text_encoder, DreamboothLoraGeneration.pipe.tokenizer)
 
-            embedding_layer = DreamboothLoraGeneration.pipe.text_encoder.get_input_embeddings()
-            token_id = DreamboothLoraGeneration.pipe.tokenizer.convert_tokens_to_ids("<env_7>")
-            embedding = embedding_layer.weight[token_id]
+            # embedding_layer = DreamboothLoraGeneration.pipe.text_encoder.get_input_embeddings()
+            # token_id = DreamboothLoraGeneration.pipe.tokenizer.convert_tokens_to_ids("<env_7>")
+            # embedding = embedding_layer.weight[token_id]
 
-            print("Token ID:", token_id)
-            print("Embedding shape:", embedding)
+            # print("Token ID:", token_id)
+            # print("Embedding shape:", embedding)
 
             unet = DreamboothLoraGeneration.pipe.unet
             lora_attn_procs = {}
@@ -233,9 +233,20 @@ class DreamboothLoraGeneration(GenerativeMixup):
         env_id = metadata.get("env_id", "")
         if self.env2placeholder is not None:
             env_id = self.env2placeholder.get(env_id, env_id)
-        env_id += " conditions"
+        cam = f'cam{(int(env_id[3:])-1) // 50 + 1}'
+        cam_to_num_tokens = {'cam7': 2, 'cam1': 3, 'cam2': 2, 'cam3': 4, 'cam4': 2, 'cam5': 3, 'cam6': 3}
+        num_tokens = cam_to_num_tokens[cam]
+        
+        env_desc = ""
+        for i in range(1, num_tokens+1):
+            if i == num_tokens:
+                env_token = f"<env_{env_id[3:]}_{i}>"
+            else:
+                env_token = f"<env_{env_id[3:]}_{i}> "
+            env_desc += env_token
+        
         # Single prompt string
-        prompt_str = self.prompt.format(name=name, description=desc, conditions=env_id)
+        prompt_str = self.prompt.format(name=name, conditions=env_desc)
         print("Using prompt:", prompt_str)
         
         device = next(self.pipe.unet.parameters()).device
