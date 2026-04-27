@@ -113,6 +113,7 @@ class DreamboothLoraGeneration(GenerativeMixup):
     def __init__(self, checkpoint_path: str, 
                  model_path: str = "runwayml/stable-diffusion-v1-5",
                  embed_path: str = None,
+                 embed_path_env: str = None,
                  prompt: str = "a photo of a {name}",
                  format_name: Callable = format_name,
                  guidance_scale: float = 7.5,
@@ -142,7 +143,7 @@ class DreamboothLoraGeneration(GenerativeMixup):
             self.name2placeholder = None
             self.name2placeholder, self.placeholder2name = load_diffmix_embeddings(embed_path, DreamboothLoraGeneration.pipe.text_encoder, DreamboothLoraGeneration.pipe.tokenizer)
             data_dir = os.environ.get("HUG_LOCAL_IMAGE_TRAIN_DIR")
-            embed_path_env = os.path.join(data_dir, 'finetune_model', 'finetune_stage2_envtoken', 'learned_embeds-steps-last.bin')
+            # embed_path_env = os.path.join(data_dir, 'finetune_model', 'finetune_stage2_envtoken', 'learned_embeds-steps-last.bin')
             self.env2placeholder, self.placeholder2env = load_diffmix_embeddings_env(embed_path_env, DreamboothLoraGeneration.pipe.text_encoder, DreamboothLoraGeneration.pipe.tokenizer)
 
             # embedding_layer = DreamboothLoraGeneration.pipe.text_encoder.get_input_embeddings()
@@ -233,7 +234,7 @@ class DreamboothLoraGeneration(GenerativeMixup):
         env_id = metadata.get("env_id", "")
         if self.env2placeholder is not None:
             env_id = self.env2placeholder.get(env_id, env_id)
-        cam = f'cam{(int(env_id[3:])-1) // 50 + 1}'
+        cam = f'cam{(int(env_id[3:])-1) // 10 + 1}'
         cam_to_num_tokens = {'cam7': 2, 'cam1': 3, 'cam2': 2, 'cam3': 4, 'cam4': 2, 'cam5': 3, 'cam6': 3}
         num_tokens = cam_to_num_tokens[cam]
         

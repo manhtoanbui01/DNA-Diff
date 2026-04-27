@@ -3,11 +3,11 @@
 
 function sample {
     # Default arguments if not provided
-    data_dir=${1:-"/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/"}
+    data_dir=${1:-"/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/hf_dataset_10envs_each_cam/"}
     model_path=${2:-"/data4/toan/projects/DiVE/stable-diffusion-v1-5"}
     lora_path=${3:-"finetune_model/lora_ti/pytorch_lora_weights.safetensors"}
     embed_path=${4:-"finetune_model/lora_ti/learned_embeds-steps-last.bin"}
-    output_dir=${5:-"${data_dir%/}/finetune_model/finetune_stage2_envtoken/output_test/"}
+    output_dir=${5:-"${data_dir%/}/finetune_model/finetune_stage2_envtoken/output_step20000/"}
     resolution=${6:-512}
     
     echo "Starting image generation with:"

@@ -38,6 +38,7 @@ def generate_translations(args, in_queue, out_queue, gpu_id):
         checkpoint_path = os.path.join(data_dir, "finetune_model", "finetune_stage2_envtoken", "checkpoint-20000"),
         model_path=args.model_path,
         embed_path=os.path.join(data_dir, "finetune_model", "finetune_stage1_dive", "learned_embeds-steps-last.bin"),
+        embed_path_env=os.path.join(data_dir, "finetune_model", "finetune_stage2_envtoken", "learned_embeds-steps-20000.bin"),
         prompt=args.prompt,
         guidance_scale=args.guidance_scale,
         mask=args.mask,
@@ -170,7 +171,7 @@ def build_queue_via_metadata(
     # print("All class ids: ", all_class_ids)
     
     # cond_market1501_path = "/data4/toan/projects/DiVE/dataset/NightReID_DukeMTMC_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/cam7/env301"
-    cond_market1501_path = os.path.join(data_dir, "cam7", "env301")
+    # cond_market1501_path = os.path.join(data_dir, "cam7", "env301")
     # label2embed = {}
     # for identity in os.listdir(cond_market1501_path):
     #     label = class2label[str(int(identity))]
@@ -187,7 +188,7 @@ def build_queue_via_metadata(
             continue
 
         cam_desc_str = camera_to_description[cam_name]
-        possible_envs = [f'env{(int(cam_name[-1])-1) * 50 + i}' for i in range(1,51)]
+        possible_envs = [f'env{(int(cam_name[-1])-1) * 10 + i}' for i in range(1,11)]
         # indices = list(range(1, 11)) + list(range(40, 51))
         # base_offset = (int(cam_name[-1]) - 1) * 50
         # possible_envs = [f'env{base_offset + i}' for i in indices]
@@ -196,10 +197,8 @@ def build_queue_via_metadata(
         for class_id in all_class_ids:
             if int(class_id) <= threshold:
                 continue
-            if cam_name == "cam1" and int(class_id) < 1081:
+            if int(class_id) > 580:
                 continue
-            # if int(class_id) > 530:
-            #     continue
             # if class_id not in label2embed:
             #     continue
             label = class2label[class_id]

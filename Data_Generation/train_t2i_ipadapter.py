@@ -598,13 +598,13 @@ def main():
         for token_id in placeholder_env_ids:
             env_token = placeholder_env_ids2tokens[token_id]  # ['<env_1_1>', ...'<env_301_1>', '<env_301_2>']
             env = int(env_token.split('_')[1])
-            cam = f'cam{(env - 1) // 50 + 1}'
+            cam = f'cam{(env - 1) // 10 + 1}'
             token_order = int(env_token.strip('<>').split('_')[2])
             initial_id = cam_to_token_ids[cam][token_order-1]
             token_embeds[token_id] = token_embeds[initial_id].clone() 
             # print(f"Load token id {token_id} for token {env_token}, initial with token id {initial_id}")
 
-    text_encoder_weight_path_env = os.path.join(data_dir, "finetune_model", "finetune_stage2_envtoken", "learned_embeds-steps-last.bin")
+    text_encoder_weight_path_env = os.path.join(data_dir, "finetune_model", "finetune_stage2_envtoken", "learned_embeds-steps-20000.bin")
     learned_embeds_env = torch.load(text_encoder_weight_path_env, map_location="cpu")["learned_embeds_dict"]
 
     with torch.no_grad():

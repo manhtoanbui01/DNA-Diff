@@ -23,8 +23,8 @@ SUPER_CLASS_NAME = 'person'
 # HUG_LOCAL_IMAGE_TRAIN_DIR = "/root/autodl-tmp/process_sysu/person_sysu_market_ca_12_1011"
 HUG_LOCAL_IMAGE_TEST_DIR = "/root" #not used, doesn't matter
 
-# HUG_LOCAL_IMAGE_TRAIN_DIR = os.getenv("HUG_LOCAL_IMAGE_TRAIN_DIR")
-HUG_LOCAL_IMAGE_TRAIN_DIR = '/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/'
+HUG_LOCAL_IMAGE_TRAIN_DIR = os.getenv("HUG_LOCAL_IMAGE_TRAIN_DIR")
+# HUG_LOCAL_IMAGE_TRAIN_DIR = '/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/'
 if HUG_LOCAL_IMAGE_TRAIN_DIR is None:
     raise ValueError("HUG_LOCAL_IMAGE_TRAIN_DIR env variable is not set.")
 
@@ -410,8 +410,9 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
         )  # [env1, env2, ..., env301]
         
         self.environment_names = []
+        # print("env_names: ", self.env_names)
         for env_name in self.env_names:
-            cam = f'cam{(int(env_name[3:])-1) // 50 + 1}'
+            cam = f'cam{(int(env_name[3:])-1) // 10 + 1}'
             num_tokens = self.cam_to_num_tokens[cam]
             for i in range(1, num_tokens+1):
                 self.environment_names.append(f'{env_name}_{i}')
@@ -507,7 +508,7 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
         # environment = self.dataset[idx]['environment'].strip()
         
         
-        path = f"{HUG_LOCAL_IMAGE_TRAIN_DIR.rstrip('/')}/finetune_model/finetune_stage1_dive/learned_embeds-steps-25000.bin"
+        path = f"{HUG_LOCAL_IMAGE_TRAIN_DIR.rstrip('/')}/finetune_model/finetune_stage1_dive/learned_embeds-steps-last.bin"
         self.name2placeholder = torch.load(path, map_location="cpu")["name2placeholder"]
         self.placeholder2name = torch.load(path, map_location="cpu")["placeholder2name"]
         if flag:
@@ -521,7 +522,7 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
             
             # environment = self.env2placeholder[self.dataset[idx]['environment']]
             environment = self.dataset[idx]['environment']
-            cam = f'cam{(int(environment[3:])-1) // 50 + 1}'
+            cam = f'cam{(int(environment[3:])-1) // 10 + 1}'
             num_tokens = self.cam_to_num_tokens[cam]
             domain_description = ""
             for i in range(1, num_tokens+1):
@@ -540,7 +541,7 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
             # print(f'Using caption: {prompt}')
         else:
             environment = self.dataset[idx]['environment']
-            cam = f'cam{(int(environment[3:])-1) // 50 + 1}'
+            cam = f'cam{(int(environment[3:])-1) // 10 + 1}'
             num_tokens = self.cam_to_num_tokens[cam]
             domain_description = ""
             for i in range(1, num_tokens+1):
