@@ -381,7 +381,7 @@ class DreamboothLoraGeneration(GenerativeMixup):
         env_id = metadata.get("env_id", "")
         if self.env2placeholder is not None:
             env_id = self.env2placeholder.get(env_id, env_id)
-        cam = f'cam{(int(env_id[3:])-1) // 50 + 1}'
+        cam = f'cam{(int(env_id[3:])-1) // 10 + 1}'
         cam_to_num_tokens = {'cam7': 2, 'cam1': 3, 'cam2': 2, 'cam3': 4, 'cam4': 2, 'cam5': 3, 'cam6': 3}
         num_tokens = cam_to_num_tokens[cam]
         
