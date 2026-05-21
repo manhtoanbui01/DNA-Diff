@@ -50,20 +50,20 @@ def generate_unique_descriptions(count):
 
     return codes
 
-def generate_unique_environment_tokens(count, cam_tokens = None, length=4):
-    """
-    Generate `count` unique random alphanumeric tokens of given length.
-    """
-    chars = string.ascii_letters + string.digits
-    tokens = set()
+# def generate_unique_environment_tokens(count, cam_tokens = None, length=4):
+#     """
+#     Generate `count` unique random alphanumeric tokens of given length.
+#     """
+#     chars = string.ascii_letters + string.digits
+#     tokens = set()
 
-    while len(tokens) < count:
-        token = ''.join(random.choices(chars, k=length))
-        if token in cam_tokens:
-            continue
-        tokens.add(token)
+#     while len(tokens) < count:
+#         token = ''.join(random.choices(chars, k=length))
+#         if token in cam_tokens:
+#             continue
+#         tokens.add(token)
 
-    return list(tokens)
+#     return list(tokens)
 
     
     
@@ -84,7 +84,7 @@ def main():
     
     
     # Prepare data
-    data = {"image": [], "label": [], "environment": [], "environment_description": [], "cond_image": [], "description": [], "camera": []}
+    data = {"image": [], "label": [], "environment": [], "cond_image": [], "description": [], "camera": []}
     
     # Generate per-camera code descriptions
     camera_descriptions = generate_unique_descriptions(num_cameras) 
@@ -94,10 +94,10 @@ def main():
     description_to_camera = {desc: f"cam{i}" for i, desc in enumerate(camera_descriptions, 1)}
     
     
-    environment_descriptions =  generate_unique_environment_tokens(count=301, cam_tokens=camera_to_description.values())
-    environment_to_description = {f'env{i}': desc for i, desc in enumerate(environment_descriptions, 1)}
-    description_to_environment = {desc: f'env{i}' for i, desc in enumerate(environment_descriptions, 1)}
-    print(f"Environment to description: {environment_to_description}")
+    # environment_descriptions =  generate_unique_environment_tokens(count=301, cam_tokens=camera_to_description.values())
+    # environment_to_description = {f'env{i}': desc for i, desc in enumerate(environment_descriptions, 1)}
+    # description_to_environment = {desc: f'env{i}' for i, desc in enumerate(environment_descriptions, 1)}
+    # print(f"Environment to description: {environment_to_description}")
     
     
     # Saving these mappings to a file
@@ -106,8 +106,8 @@ def main():
         "num_cameras": num_cameras,
         "camera_to_description": camera_to_description,
         "description_to_camera": description_to_camera,
-        "environment_to_description": environment_to_description,
-        "description_to_environment": description_to_environment, 
+        # "environment_to_description": environment_to_description,
+        # "description_to_environment": description_to_environment, 
     }
     mapping_file = f"camera_environment_description_mappings_{current_dataset}.json"
     with open(mapping_file, "w") as f:
@@ -116,7 +116,7 @@ def main():
     # choose all images of the same identity with different camera for condition
     def find_possible_cond_images(cam_name, cam_path, identity):
         possible_cond_image_paths = []
-        other_cam_names = [x for x in [f"cam{i+1}" for i in range(6)] if x != cam_name]
+        other_cam_names = [x for x in [f"cam{i+1}" for i in range(8)] if x != cam_name]
         for cond_cam_name in other_cam_names:
             cond_cam_path = os.path.join(os.path.dirname(cam_path), cond_cam_name)
             for env in os.listdir(cond_cam_path):
@@ -130,7 +130,7 @@ def main():
     def process_images(camera_path, camera_name):
         description = camera_to_description[camera_name]
         for environment in os.listdir(camera_path):
-            environment_description = environment_to_description[environment]
+            # environment_description = environment_to_description[environment]
             environment_path = os.path.join(camera_path, environment)
             for identity in os.listdir(environment_path):
                 identity_path = os.path.join(environment_path, identity)
@@ -150,7 +150,7 @@ def main():
                                 data["description"].append(description)
                                 data["camera"].append(camera_name)
                                 data["environment"].append(environment)
-                                data["environment_description"].append(environment_description)
+                                # data["environment_description"].append(environment_description)
                             else:
                                 print(f"Skipping image {img_path} due to insufficient height")
                     except Exception as e:
@@ -159,9 +159,9 @@ def main():
                 
     def process_market1501_images(camera_path, camera_name):
         description = camera_to_description[camera_name]
-        environment_description = environment_to_description['env301']
-        for identity in os.listdir(os.path.join(camera_path, 'env301')):
-            identity_path = os.path.join(camera_path, 'env301', identity)
+        # environment_description = environment_to_description['env81']
+        for identity in os.listdir(os.path.join(camera_path, 'env81')):
+            identity_path = os.path.join(camera_path, 'env81', identity)
             for image in os.listdir(identity_path):
                 img_path = os.path.join(identity_path, image)
                 possible_cond_image_paths = [os.path.join(identity_path, img) for img in os.listdir(identity_path) if img != image]
@@ -175,15 +175,15 @@ def main():
                     data["cond_image"].append(possible_cond_image_paths)
                     data["description"].append(description)
                     data["camera"].append(camera_name)
-                    data["environment"].append("env301")
-                    data["environment_description"].append(environment_description)
+                    data["environment"].append("env81")
+                    # data["environment_description"].append(environment_description)
         
             
     # Process images by environment
     camera_paths = [os.path.join(base_path, f"cam{i}") for i in range(1, num_cameras + 1)]
-    if os.path.join(base_path, "cam7") in camera_paths:
-        camera_paths = [cam for cam in camera_paths if cam != os.path.join(base_path, "cam7")]
-        process_market1501_images(camera_path=os.path.join(base_path, 'cam7'), camera_name='cam7')
+    if os.path.join(base_path, "cam9") in camera_paths:
+        camera_paths = [cam for cam in camera_paths if cam != os.path.join(base_path, "cam9")]
+        process_market1501_images(camera_path=os.path.join(base_path, 'cam9'), camera_name='cam9')
         
     for i, camera_path in enumerate(camera_paths, 1):
         camera_name = f"cam{i}"
@@ -201,7 +201,7 @@ def main():
                 "description": datasets.Value("string"),
                 "camera": datasets.Value("string"),
                 "environment": datasets.Value("string"),
-                "environment_description": datasets.Value("string"),
+                # "environment_description": datasets.Value("string"),
             }
         )
     )
@@ -211,9 +211,9 @@ def main():
     for cam_name in camera_to_description.keys():
         camera_indices[cam_name] = [i for i,c in enumerate(data['camera']) if c == cam_name]
     
-    environment_indices = {}
-    for env_name in environment_to_description.keys():
-        environment_indices[env_name] = [i for i,e in enumerate(data['environment']) if e == env_name]
+    # environment_indices = {}
+    # for env_name in environment_to_description.keys():
+    #     environment_indices[env_name] = [i for i,e in enumerate(data['environment']) if e == env_name]
         
     # Prepare metadata dict
     metadata_dict = {
@@ -222,9 +222,9 @@ def main():
         "camera_indices": camera_indices,
         "camera_to_description": camera_to_description,
         "description_to_camera": description_to_camera,
-        "environment_indices": environment_indices,
-        "environment_to_description": environment_to_description,
-        "description_to_environment": description_to_environment,
+        # "environment_indices": environment_indices,
+        # "environment_to_description": environment_to_description,
+        # "description_to_environment": description_to_environment,
     }
     
     # Store metadata as JSON in dataset.info.description
