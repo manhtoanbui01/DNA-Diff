@@ -508,7 +508,7 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
         # environment = self.dataset[idx]['environment'].strip()
         
         
-        path = f"{HUG_LOCAL_IMAGE_TRAIN_DIR.rstrip('/')}/finetune_model/finetune_stage1_dive/learned_embeds-steps-last.bin"
+        path = f"{HUG_LOCAL_IMAGE_TRAIN_DIR.rstrip('/')}/stage1_100000steps/finetune_model/finetune_stage1_dive/learned_embeds-steps-100000.bin"
         self.name2placeholder = torch.load(path, map_location="cpu")["name2placeholder"]
         self.placeholder2name = torch.load(path, map_location="cpu")["placeholder2name"]
         if flag:
