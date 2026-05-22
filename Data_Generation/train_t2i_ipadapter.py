@@ -184,7 +184,7 @@ def parse_args():
     parser.add_argument(
         "--gradient_accumulation_steps",
         type=int,
-        default=2,
+        default=1,
         help="Number of updates steps to accumulate before performing a backward/update pass.",
     )
     parser.add_argument(
@@ -550,7 +550,7 @@ def main():
 
 
     data_dir = os.environ.get("HUG_LOCAL_IMAGE_TRAIN_DIR")
-    text_encoder_weight_path = os.path.join(data_dir, "finetune_model", "finetune_stage1_dive", "learned_embeds-steps-last.bin")
+    text_encoder_weight_path = os.path.join(data_dir, "stage1_100000steps","finetune_model","finetune_stage1_dive", "learned_embeds-steps-100000.bin")
     learned_embeds = torch.load(text_encoder_weight_path, map_location="cpu")["learned_embeds_dict"]
 
     with torch.no_grad():
@@ -604,7 +604,7 @@ def main():
             token_embeds[token_id] = token_embeds[initial_id].clone() 
             # print(f"Load token id {token_id} for token {env_token}, initial with token id {initial_id}")
 
-    text_encoder_weight_path_env = os.path.join(data_dir, "finetune_model", "finetune_stage2_envtoken", "learned_embeds-steps-20000.bin")
+    text_encoder_weight_path_env = os.path.join(data_dir,"stage1_100000steps", "finetune_model", "finetune_stage2_envtoken", "learned_embeds-steps-40000.bin")
     learned_embeds_env = torch.load(text_encoder_weight_path_env, map_location="cpu")["learned_embeds_dict"]
 
     with torch.no_grad():
@@ -656,7 +656,7 @@ def main():
     # Load stage 2 Env_Token weight
     from safetensors.torch import load_file
     # ckpt_path = "/data4/toan/projects/DiVE/dataset/NightReID_DukeMTMC_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage2_envtoken/checkpoint-10000/model.safetensors"
-    ckpt_path = os.path.join(data_dir, "finetune_model", "finetune_stage2_envtoken", "checkpoint-20000", "model.safetensors")
+    ckpt_path = os.path.join(data_dir,"stage1_100000steps", "finetune_model", "finetune_stage2_envtoken", "checkpoint-40000", "model.safetensors")
     state_dict = load_file(ckpt_path)
     missing, unexpected = unet.load_state_dict(state_dict, strict=False)
 

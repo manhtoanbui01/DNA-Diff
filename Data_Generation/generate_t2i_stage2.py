@@ -35,10 +35,10 @@ data_dir = os.environ.get("HUG_LOCAL_IMAGE_TRAIN_DIR")
     
 def generate_translations(args, in_queue, out_queue, gpu_id):
     model = DreamboothLoraGeneration(
-        checkpoint_path = os.path.join(data_dir, "finetune_model", "finetune_stage2_envtoken", "checkpoint-20000"),
+        checkpoint_path = os.path.join(data_dir, "stage1_100000steps", "finetune_model", "finetune_stage2_envtoken", "checkpoint-40000"),
         model_path=args.model_path,
-        embed_path=os.path.join(data_dir, "finetune_model", "finetune_stage1_dive", "learned_embeds-steps-last.bin"),
-        embed_path_env=os.path.join(data_dir, "finetune_model", "finetune_stage2_envtoken", "learned_embeds-steps-20000.bin"),
+        embed_path=os.path.join(data_dir, "stage1_100000steps", "finetune_model", "finetune_stage1_dive", "learned_embeds-steps-100000.bin"),
+        embed_path_env=os.path.join(data_dir, "stage1_100000steps", "finetune_model", "finetune_stage2_envtoken", "learned_embeds-steps-40000.bin"),
         prompt=args.prompt,
         guidance_scale=args.guidance_scale,
         mask=args.mask,
@@ -116,7 +116,7 @@ def generate_translations(args, in_queue, out_queue, gpu_id):
                 os.makedirs(subfolder, exist_ok=True)
 
             for local_idx, pil_image in enumerate(image_list, start=1):
-                filename = f"{image_name}_{env_id}.jpg"
+                filename = f"{env_id}_{image_name}.jpg"
                 save_path = os.path.join(subfolder, filename)
                 pil_image.save(save_path)
                 print(f"Saved {save_path}")
@@ -197,8 +197,8 @@ def build_queue_via_metadata(
         for class_id in all_class_ids:
             if int(class_id) <= threshold:
                 continue
-            if int(class_id) > 580:
-                continue
+            # if int(class_id) > 530:
+            #     continue
             # if class_id not in label2embed:
             #     continue
             label = class2label[class_id]
@@ -217,6 +217,14 @@ def build_queue_via_metadata(
                 # Enqueue i_list (rather than a single i)
                 # idx = torch.randint(0, embeds.shape[0], (1,))
                 cond_embed = None
+                # if len(i_list) <= len(possible_envs):
+                #     idx = torch.randperm(len(possible_envs))[:len(i_list)]
+                # else:
+                #     idx = torch.randint(
+                #         0,
+                #         len(possible_envs),
+                #         (len(i_list),)
+                #     )
                 env_id = random.choice(possible_envs)  # choose random environment
                 in_queue.put((i_list, cam_name, cam_desc_str, env_id, class_id, cond_embed, strength))
 
