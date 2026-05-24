@@ -267,7 +267,7 @@ class DreamboothLoraGeneration(GenerativeMixup):
             # embed_path = "/data4/toan/projects/DiVE/dataset/NightReID_DukeMTMC_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage1_dive/learned_embeds-steps-last.bin"
             self.name2placeholder, self.placeholder2name = load_diffmix_embeddings(embed_path, DreamboothLoraGeneration.pipe.text_encoder, DreamboothLoraGeneration.pipe.tokenizer)
             data_dir = os.environ.get("HUG_LOCAL_IMAGE_TRAIN_DIR")
-            embed_path_env = os.path.join(data_dir, 'finetune_model', 'finetune_stage2_envtoken', 'learned_embeds-steps-last.bin')
+            embed_path_env = os.path.join(data_dir, "stage1_100000steps", 'finetune_model', 'finetune_stage2_envtoken', 'learned_embeds-steps-40000.bin')
             self.env2placeholder, self.placeholder2env = load_diffmix_embeddings_env(embed_path_env, DreamboothLoraGeneration.pipe.text_encoder, DreamboothLoraGeneration.pipe.tokenizer)
             
             # embedding_layer = DreamboothLoraGeneration.pipe.text_encoder.get_input_embeddings()

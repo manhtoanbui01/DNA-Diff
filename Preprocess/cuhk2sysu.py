@@ -18,13 +18,13 @@ def main():
     parser.add_argument(
         "--sysu_dir",
         type=str,
-        default="/data4/toan/projects/DiVE/dataset/NightReID_CUHK03_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity/",
+        default="/data4/toan/projects/DiVE/dataset/Night600_CUHK03_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity/",
         help="Root directory path of the SYSU-MM01 dataset"
     )
     parser.add_argument(
         "--max_sysu_id",
         type=int,
-        default=500,
+        default=300,
         help="Current maximum SYSU ID (default 533, can be changed dynamically)"
     )
     parser.add_argument(
@@ -43,8 +43,8 @@ def main():
     sysu_dir = args.sysu_dir
 
     # Name of the new camera folder
-    new_cam_folder = "cam7"
-    new_cam_dir = os.path.join(sysu_dir, new_cam_folder, "env301")
+    new_cam_folder = "cam9"
+    new_cam_dir = os.path.join(sysu_dir, new_cam_folder, "env81")
 
     # Create the new camera folder (if it does not exist)
     os.makedirs(new_cam_dir, exist_ok=True)

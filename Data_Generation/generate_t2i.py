@@ -35,9 +35,9 @@ data_dir = os.environ.get("HUG_LOCAL_IMAGE_TRAIN_DIR")
     
 def generate_translations(args, in_queue, out_queue, gpu_id):
     model = DreamboothLoraGeneration(
-        checkpoint_path = os.path.join(data_dir, "finetune_model", "finetune_stage3_ipadapter", "checkpoint-25000"),
+        checkpoint_path = os.path.join(data_dir, "stage1_100000steps", "finetune_model", "finetune_stage3_ipadapter", "checkpoint-50000"),
         model_path=args.model_path,
-        embed_path=os.path.join(data_dir, "finetune_model", "finetune_stage1_dive", "learned_embeds-steps-last.bin"),
+        embed_path=os.path.join(data_dir, "stage1_100000steps", "finetune_model", "finetune_stage1_dive", "learned_embeds-steps-100000.bin"),
         prompt=args.prompt,
         guidance_scale=args.guidance_scale,
         mask=args.mask,
@@ -114,7 +114,7 @@ def generate_translations(args, in_queue, out_queue, gpu_id):
                 os.makedirs(subfolder, exist_ok=True)
 
             for local_idx, pil_image in enumerate(image_list, start=1):
-                filename = f"{image_name}_{env_id}.jpg"
+                filename = f"{env_id}_{image_name}.jpg"
                 save_path = os.path.join(subfolder, filename)
                 pil_image.save(save_path)
                 print(f"Saved {save_path}")
