@@ -35,7 +35,7 @@ data_dir = os.environ.get("HUG_LOCAL_IMAGE_TRAIN_DIR")
     
 def generate_translations(args, in_queue, out_queue, gpu_id):
     model = DreamboothLoraGeneration(
-        checkpoint_path = os.path.join(data_dir, "stage1_100000steps", "finetune_model", "finetune_stage3_ipadapter", "checkpoint-50000"),
+        checkpoint_path = os.path.join(data_dir, "stage1_100000steps", "finetune_model", "finetune_stage3_ipadapter", "checkpoint-30000"),
         model_path=args.model_path,
         embed_path=os.path.join(data_dir, "stage1_100000steps", "finetune_model", "finetune_stage1_dive", "learned_embeds-steps-100000.bin"),
         prompt=args.prompt,
@@ -193,6 +193,8 @@ def build_queue_via_metadata(
         for class_id in all_class_ids:
             if int(class_id) <= threshold:
                 continue
+            # if int(class_id) != 1987:
+            #     continue
             # if cam_name == "cam1" and int(class_id) < 1561:
             #     continue
             # if class_id not in label2embed:

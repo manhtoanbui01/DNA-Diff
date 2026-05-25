@@ -402,7 +402,15 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
         self.name2placeholder = None
         self.placeholder2name = None
         
-        self.cam_to_num_tokens = {'cam7': 2, 'cam1': 3, 'cam2': 2, 'cam3': 4, 'cam4': 2, 'cam5': 3, 'cam6': 3}  # the number of tokens for each chosen camera token
+        cam_to_num_tokens = {}
+        for sample in dataset:
+            camera = sample["camera"]
+            num_tokens = sample["num_camera_tokens"]
+            # keep first occurrence
+            if camera not in cam_to_num_tokens:
+                cam_to_num_tokens[camera] = num_tokens
+        
+        self.cam_to_num_tokens = cam_to_num_tokens
 
         self.env_names = sorted(
             list(set(dataset['environment'])), 
@@ -508,7 +516,7 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
         # environment = self.dataset[idx]['environment'].strip()
         
         
-        path = f"{HUG_LOCAL_IMAGE_TRAIN_DIR.rstrip('/')}/stage1_100000steps/finetune_model/finetune_stage1_dive/learned_embeds-steps-100000.bin"
+        path = f"{HUG_LOCAL_IMAGE_TRAIN_DIR.rstrip('/')}/finetune_model/finetune_stage1_dive/learned_embeds-steps-60000.bin"
         self.name2placeholder = torch.load(path, map_location="cpu")["name2placeholder"]
         self.placeholder2name = torch.load(path, map_location="cpu")["placeholder2name"]
         if flag:
