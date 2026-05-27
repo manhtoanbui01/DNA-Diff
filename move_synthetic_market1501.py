@@ -14,7 +14,7 @@ def move_synthetic_data(synthetic_dir, target_dir, ipc: int = 3):  # ipc: number
         # if cam_name != "3":
         #     continue
         for id in os.listdir(os.path.join(synthetic_dir, cam)):
-            real_id = str(int(id)+10000)
+            real_id = str(int(id)+20000)
             images = [image for image in os.listdir(os.path.join(synthetic_dir, cam, id))]
             if len(images) < ipc:
                 random_ipc_images = images

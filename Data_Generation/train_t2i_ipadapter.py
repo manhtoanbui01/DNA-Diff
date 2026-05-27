@@ -550,7 +550,7 @@ def main():
 
 
     data_dir = os.environ.get("HUG_LOCAL_IMAGE_TRAIN_DIR")
-    text_encoder_weight_path = os.path.join(data_dir, "stage1_100000steps","finetune_model","finetune_stage1_dive", "learned_embeds-steps-100000.bin")
+    text_encoder_weight_path = os.path.join(data_dir,"finetune_model","finetune_stage1_dive", "learned_embeds-steps-100000.bin")
     learned_embeds = torch.load(text_encoder_weight_path, map_location="cpu")["learned_embeds_dict"]
 
     with torch.no_grad():
@@ -559,7 +559,9 @@ def main():
             # print(f"Loaded weight for token id {token_id}")
             token_embeds[token_id] = embed
     
-    camera_to_description = {'cam7': 'Suqf', 'cam1': 'O1ek', 'cam2': 'lATC', 'cam3': 'p65Y', 'cam4': 'bUgJ', 'cam5': 'wnQW', 'cam6': 'E4KL'}
+    camera_to_description = train_dataset.camera_to_description
+    print(f'camera_to_description: {camera_to_description}')
+    
     cam_to_token_ids = {}
 
     for cam in camera_to_description:
@@ -604,7 +606,7 @@ def main():
             token_embeds[token_id] = token_embeds[initial_id].clone() 
             # print(f"Load token id {token_id} for token {env_token}, initial with token id {initial_id}")
 
-    text_encoder_weight_path_env = os.path.join(data_dir,"stage1_100000steps", "finetune_model", "finetune_stage2_envtoken", "learned_embeds-steps-40000.bin")
+    text_encoder_weight_path_env = os.path.join(data_dir, "finetune_model", "finetune_stage2_envtoken", "learned_embeds-steps-40000.bin")
     learned_embeds_env = torch.load(text_encoder_weight_path_env, map_location="cpu")["learned_embeds_dict"]
 
     with torch.no_grad():
@@ -656,7 +658,7 @@ def main():
     # Load stage 2 Env_Token weight
     from safetensors.torch import load_file
     # ckpt_path = "/data4/toan/projects/DiVE/dataset/NightReID_DukeMTMC_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage2_envtoken/checkpoint-10000/model.safetensors"
-    ckpt_path = os.path.join(data_dir,"stage1_100000steps", "finetune_model", "finetune_stage2_envtoken", "checkpoint-40000", "model.safetensors")
+    ckpt_path = os.path.join(data_dir, "finetune_model", "finetune_stage2_envtoken", "checkpoint-40000", "model.safetensors")
     state_dict = load_file(ckpt_path)
     missing, unexpected = unet.load_state_dict(state_dict, strict=False)
 

@@ -35,9 +35,9 @@ data_dir = os.environ.get("HUG_LOCAL_IMAGE_TRAIN_DIR")
     
 def generate_translations(args, in_queue, out_queue, gpu_id):
     model = DreamboothLoraGeneration(
-        checkpoint_path = os.path.join(data_dir, "stage1_100000steps", "finetune_model", "finetune_stage3_ipadapter", "checkpoint-30000"),
+        checkpoint_path = os.path.join(data_dir, "finetune_model", "finetune_stage3_ipadapter", "checkpoint-30000"),
         model_path=args.model_path,
-        embed_path=os.path.join(data_dir, "stage1_100000steps", "finetune_model", "finetune_stage1_dive", "learned_embeds-steps-100000.bin"),
+        embed_path=os.path.join(data_dir, "finetune_model", "finetune_stage1_dive", "learned_embeds-steps-100000.bin"),
         prompt=args.prompt,
         guidance_scale=args.guidance_scale,
         mask=args.mask,
@@ -50,6 +50,7 @@ def generate_translations(args, in_queue, out_queue, gpu_id):
         i_lists = []
         cam_names = []
         descriptions = []
+        num_cam_tokens = []
         env_ids = []
         class_ids = []
         cond_embeds = []
@@ -59,10 +60,11 @@ def generate_translations(args, in_queue, out_queue, gpu_id):
         for _ in range(batch_size):
             try:
                 # Now the queue items are (i_list, cam_name, desc, class_id, strength)
-                q_i_list, q_cam_name, q_desc, q_env_id, q_class_id, q_cond_embed, q_strength = in_queue.get(timeout=1)
+                q_i_list, q_cam_name, q_desc, q_num_cam_token, q_env_id, q_class_id, q_cond_embed, q_strength = in_queue.get(timeout=1)
                 i_lists.append(q_i_list)
                 cam_names.append(q_cam_name)
                 descriptions.append(q_desc)
+                num_cam_tokens.append(q_num_cam_token)
                 env_ids.append(q_env_id)
                 class_ids.append(q_class_id)
                 cond_embeds.append(q_cond_embed)
@@ -76,10 +78,11 @@ def generate_translations(args, in_queue, out_queue, gpu_id):
 
         # 2) Generate for each item in the batch
         results = []
-        for i_list, cam, desc, env_id, nm, cond_embed, stg in zip(i_lists, cam_names, descriptions, env_ids, class_ids, cond_embeds, strengths):
+        for i_list, cam, desc, num_cam_token, env_id, nm, cond_embed, stg in zip(i_lists, cam_names, descriptions, num_cam_tokens, env_ids, class_ids, cond_embeds, strengths):
             metadata = {
                 "camera_name": cam,
                 "description": desc,
+                "num_cam_token": num_cam_token,
                 "env_id": env_id,
                 "class_id": nm,
                 "cond_embed": cond_embed,
@@ -167,7 +170,7 @@ def build_queue_via_metadata(
     all_class_ids = class2label.keys()
     # print("Class to label: ", class2label)
     # print("All class ids: ", all_class_ids)
-    
+    cam_to_num_tokens = {'cam1': 3, 'cam2': 2, 'cam3': 4, 'cam4': 2, 'cam5': 3, 'cam6': 3}
     cond_market1501_path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/cam7/env301"
     # cond_market1501_path = os.path.join(data_dir, "cam7", "env301")
     label2embed = {}
@@ -184,6 +187,7 @@ def build_queue_via_metadata(
             continue
 
         cam_desc_str = camera_to_description[cam_name]
+        num_cam_token = cam_to_num_tokens[cam_name]
         possible_envs = [f'env{(int(cam_name[-1])-1) * 10 + i}' for i in range(1,11)]
         # indices = list(range(1, 11)) + list(range(40, 51))
         # base_offset = (int(cam_name[-1]) - 1) * 50
@@ -193,8 +197,8 @@ def build_queue_via_metadata(
         for class_id in all_class_ids:
             if int(class_id) <= threshold:
                 continue
-            # if int(class_id) != 1987:
-            #     continue
+            if int(class_id) not in [1310, 1470, 1502, 1613, 1614, 1652, 1763, 1800, 1923, 1950, 1962]:
+                continue
             # if cam_name == "cam1" and int(class_id) < 1561:
             #     continue
             # if class_id not in label2embed:
@@ -216,7 +220,7 @@ def build_queue_via_metadata(
                 idx = torch.randint(0, embeds.shape[0], (1,))
                 cond_embed = embeds[idx].squeeze(0)
                 env_id = random.choice(possible_envs)  # choose random environment
-                in_queue.put((i_list, cam_name, cam_desc_str, env_id, class_id, cond_embed, strength))
+                in_queue.put((i_list, cam_name, cam_desc_str, num_cam_token, env_id, class_id, cond_embed, strength))
 
             # Advance overall index_counter by 'repeat_each_id'
             index_counter += repeat_each_id
@@ -320,7 +324,7 @@ if __name__ == "__main__":
     parser.add_argument("--debug", action="store_true", help="Use debugging mode (single-process).")
     parser.add_argument("--cameras", nargs="+", default=None, help="List of camera names or descriptions to process (e.g. cam1 cam2). If not set, we gather all unique cameras from the dataset.")
     parser.add_argument("--repeat_each_id", type=int, default=1, help="How many times to enqueue each ID in every camera.")
-    parser.add_argument("--threshold", type=int, default=500, help="Ignore classes with numeric ID <= this threshold.")
+    parser.add_argument("--threshold", type=int, default=300, help="Ignore classes with numeric ID <= this threshold.")
     parser.add_argument("--images_per_call", type=int, default=1, help="Number of images generated per pipeline call.")
     parser.add_argument("--model_path", type=str, default="CompVis/stable-diffusion-v1-4", help="Base model path.")
     parser.add_argument("--lora_path", type=str, default='finetune_model/lora_ti/pytorch_lora_weights.safetensors', help="path to lora")
