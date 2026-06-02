@@ -197,7 +197,7 @@ def build_queue_via_metadata(
         for class_id in all_class_ids:
             if int(class_id) <= threshold:
                 continue
-            if int(class_id) not in [1310, 1470, 1502, 1613, 1614, 1652, 1763, 1800, 1923, 1950, 1962]:
+            if int(class_id) not in [501]:
                 continue
             # if cam_name == "cam1" and int(class_id) < 1561:
             #     continue
