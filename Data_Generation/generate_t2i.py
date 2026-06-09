@@ -9,6 +9,8 @@ import random
 import time
 import numpy as np
 import pandas as pd
+import kornia
+import torchvision.transforms as T
 
 from semantic_aug.datasets.person_revised import PersonHugDataset
 from semantic_aug.augmentations.dreabooth_lora_mt import DreamboothLoraGeneration
@@ -29,6 +31,47 @@ osnet = FeatureExtractor(
 )
 osnet.model.eval()
 osnet.model.requires_grad_(False)
+
+# Reproduce the EXACT OSNet preprocessing used in stage-3 training
+# (train_t2i_ipadapter.py). The torchreid FeatureExtractor wrapper resizes
+# straight to (256,128) with bilinear interpolation, but training resizes the
+# cond image to (512,256) bilinear (via the dataset transform) and then to
+# (256,128) with kornia bicubic. Aligning inference to training keeps the
+# trained image_proj_model's input distribution consistent.
+_OSNET_RESIZE = T.Compose([
+    T.Resize((512, 256), interpolation=T.InterpolationMode.BILINEAR),
+    T.ToTensor(),
+    T.Normalize([0.5], [0.5]),   # -> [-1, 1], matching the dataset's self.transform
+])
+
+
+def _osnet_preprocess(x):
+    # Identical to preprocess() in train_t2i_ipadapter.py.
+    dtype = x.dtype
+    x = kornia.geometry.resize(
+        x.to(torch.float32), (256, 128),
+        interpolation='bicubic', align_corners=True, antialias=False,
+    ).to(dtype=dtype)
+    x = (x + 1.) / 2.  # [-1,1] -> [0,1]
+    x = x.clamp(0, 1)
+    x = kornia.enhance.normalize(
+        x,
+        torch.Tensor([0.485, 0.456, 0.406]),
+        torch.Tensor([0.229, 0.224, 0.225]),
+    )
+    return x
+
+
+@torch.no_grad()
+def extract_osnet_embeds(image_paths):
+    """OSNet features for a list of image paths, preprocessed exactly as in training."""
+    device = next(osnet.model.parameters()).device
+    imgs = torch.stack(
+        [_OSNET_RESIZE(Image.open(p).convert('RGB')) for p in image_paths], dim=0
+    )
+    imgs = _osnet_preprocess(imgs).to(device)  # preprocess on CPU, then move (mirrors training)
+    return osnet.model(imgs)
+
 
 data_dir = os.environ.get("HUG_LOCAL_IMAGE_TRAIN_DIR")
 
@@ -177,7 +220,7 @@ def build_queue_via_metadata(
     for identity in os.listdir(cond_market1501_path):
         label = class2label[str(int(identity))]
         possible_cond_image_paths = [os.path.join(cond_market1501_path, identity, image) for image in os.listdir(os.path.join(cond_market1501_path, identity))]
-        possible_cond_embeds = osnet(possible_cond_image_paths)
+        possible_cond_embeds = extract_osnet_embeds(possible_cond_image_paths)
         label2embed[label] = possible_cond_embeds
         
 
