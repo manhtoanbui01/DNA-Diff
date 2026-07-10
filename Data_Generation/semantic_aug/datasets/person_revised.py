@@ -420,7 +420,7 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
         self.environment_names = []
         # print("env_names: ", self.env_names)
         for env_name in self.env_names:
-            cam = f'cam{(int(env_name[3:])-1) // 10 + 1}'
+            cam = f'cam{(int(env_name[3:])-1) // 15 + 1}'
             num_tokens = self.cam_to_num_tokens[cam]
             for i in range(1, num_tokens+1):
                 self.environment_names.append(f'{env_name}_{i}')
@@ -530,7 +530,7 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
             
             # environment = self.env2placeholder[self.dataset[idx]['environment']]
             environment = self.dataset[idx]['environment']
-            cam = f'cam{(int(environment[3:])-1) // 10 + 1}'
+            cam = f'cam{(int(environment[3:])-1) // 15 + 1}'
             num_tokens = self.cam_to_num_tokens[cam]
             domain_description = ""
             for i in range(1, num_tokens+1):
@@ -549,7 +549,7 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
             # print(f'Using caption: {prompt}')
         else:
             environment = self.dataset[idx]['environment']
-            cam = f'cam{(int(environment[3:])-1) // 10 + 1}'
+            cam = f'cam{(int(environment[3:])-1) // 15 + 1}'
             num_tokens = self.cam_to_num_tokens[cam]
             domain_description = ""
             for i in range(1, num_tokens+1):

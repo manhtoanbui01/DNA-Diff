@@ -4,75 +4,75 @@ from transformers import CLIPTokenizer
 # =========================
 # Paths
 # =========================
-# dataset_path = "/data4/toan/projects/DiVE/dataset/Night600_CUHK03_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity/"
-# save_path = "/data4/toan/projects/DiVE/dataset/Night600_CUHK03_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity/test/"
+dataset_path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/hf_dataset_15envs_each_cam/"
+save_path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/hf_dataset_15envs_each_cam/test/"
 
-# # =========================
-# # Load dataset
-# # =========================
-# dataset = load_from_disk(dataset_path)
+# =========================
+# Load dataset
+# =========================
+dataset = load_from_disk(dataset_path)
 
-# # =========================
-# # Load tokenizer
-# # =========================
-# tokenizer = CLIPTokenizer.from_pretrained(
-#     "runwayml/stable-diffusion-v1-5",
-#     subfolder="tokenizer"
-# )
+# =========================
+# Load tokenizer
+# =========================
+tokenizer = CLIPTokenizer.from_pretrained(
+    "runwayml/stable-diffusion-v1-5",
+    subfolder="tokenizer"
+)
 
-# # =========================
-# # Count tokens
-# # =========================
-# num_camera_tokens = []
+# =========================
+# Count tokens
+# =========================
+num_camera_tokens = []
 
-# for sample in dataset:
+for sample in dataset:
 
-#     text = sample["description"]
+    text = sample["description"]
 
-#     token_ids = tokenizer(
-#         text,
-#         add_special_tokens=False,
-#         truncation=False,
-#     )["input_ids"]
+    token_ids = tokenizer(
+        text,
+        add_special_tokens=False,
+        truncation=False,
+    )["input_ids"]
 
-#     num_camera_tokens.append(len(token_ids))
+    num_camera_tokens.append(len(token_ids))
 
-# # =========================
-# # Add new column
-# # =========================
-# dataset = dataset.add_column(
-#     "num_camera_tokens",
-#     num_camera_tokens
-# )
+# =========================
+# Add new column
+# =========================
+dataset = dataset.add_column(
+    "num_camera_tokens",
+    num_camera_tokens
+)
 
-# # =========================
-# # Save dataset
-# # =========================
-# dataset.save_to_disk(save_path)
+# =========================
+# Save dataset
+# =========================
+dataset.save_to_disk(save_path)
 
-# print(dataset)
-# print("Done!")
+print(dataset)
+print("Done!")
 
 
 
 # test code
 
-from datasets import load_from_disk
+# from datasets import load_from_disk
 
-# load dataset
-dataset = load_from_disk("/data4/toan/projects/DiVE/dataset/Night600_CUHK03_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity/")
+# # load dataset
+# dataset = load_from_disk("/data4/toan/projects/DiVE/dataset/Night600_CUHK03_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity/")
 
-# create dictionary
-camera_to_num_tokens = {}
+# # create dictionary
+# camera_to_num_tokens = {}
 
-for sample in dataset:
+# for sample in dataset:
 
-    camera = sample["camera"]
-    num_tokens = sample["num_camera_tokens"]
+#     camera = sample["camera"]
+#     num_tokens = sample["num_camera_tokens"]
 
-    # keep first occurrence
-    if camera not in camera_to_num_tokens:
-        camera_to_num_tokens[camera] = num_tokens
+#     # keep first occurrence
+#     if camera not in camera_to_num_tokens:
+#         camera_to_num_tokens[camera] = num_tokens
 
-# print dictionary
-print(camera_to_num_tokens)
+# # print dictionary
+# print(camera_to_num_tokens)

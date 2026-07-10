@@ -600,7 +600,7 @@ def main():
         for token_id in placeholder_env_ids:
             env_token = placeholder_env_ids2tokens[token_id]  # ['<env_1_1>', ...'<env_301_1>', '<env_301_2>']
             env = int(env_token.split('_')[1])
-            cam = f'cam{(env - 1) // 10 + 1}'
+            cam = f'cam{(env - 1) // 15 + 1}'
             token_order = int(env_token.strip('<>').split('_')[2])
             initial_id = cam_to_token_ids[cam][token_order-1]
             token_embeds[token_id] = token_embeds[initial_id].clone() 

@@ -7,7 +7,7 @@ function sample {
     model_path=${2:-"/data4/toan/projects/DiVE/stable-diffusion-v1-5"}
     lora_path=${3:-"finetune_model/lora_ti/pytorch_lora_weights.safetensors"}
     embed_path=${4:-"finetune_model/lora_ti/learned_embeds-steps-last.bin"}
-    output_dir=${5:-"${data_dir%/}/stage1_100000steps/finetune_model/finetune_stage2_envtoken/output_step40000/"}
+    output_dir=${5:-"${data_dir%/}/stage1_100000steps/finetune_model/finetune_stage2_envtoken/output_step40000_multiple_images/"}
     resolution=${6:-512}
     
     echo "Starting image generation with:"
@@ -24,9 +24,9 @@ function sample {
     python generate_t2i_stage2.py \
     --output_path "$output_dir" \
     --resolution $resolution \
-    --gpu_ids 0 1 2 \
+    --gpu_ids 0 1 2 3 \
     --cameras cam1 cam2 cam3 cam4 cam5 cam6 \
-    --repeat_each_id 3 \
+    --repeat_each_id 7 \
     --batch_size 60 \
     --images_per_call 1 \
     --model_path "$model_path" \

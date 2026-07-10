@@ -231,7 +231,7 @@ def build_queue_via_metadata(
 
         cam_desc_str = camera_to_description[cam_name]
         num_cam_token = cam_to_num_tokens[cam_name]
-        possible_envs = [f'env{(int(cam_name[-1])-1) * 10 + i}' for i in range(1,11)]
+        possible_envs = [f'env{(int(cam_name[-1])-1) * 15 + i}' for i in range(1,16)]
         # indices = list(range(1, 11)) + list(range(40, 51))
         # base_offset = (int(cam_name[-1]) - 1) * 50
         # possible_envs = [f'env{base_offset + i}' for i in indices]
@@ -240,9 +240,9 @@ def build_queue_via_metadata(
         for class_id in all_class_ids:
             if int(class_id) <= threshold:
                 continue
-            if int(class_id) not in [501]:
-                continue
-            # if cam_name == "cam1" and int(class_id) < 1561:
+            # if int(class_id) not in [501]:
+            #     continue
+            # if cam_name in ["cam1", "cam2", "cam3", "cam4"] or (cam_name == "cam5" and int(class_id) < 1704):
             #     continue
             # if class_id not in label2embed:
             #     continue
@@ -367,7 +367,7 @@ if __name__ == "__main__":
     parser.add_argument("--debug", action="store_true", help="Use debugging mode (single-process).")
     parser.add_argument("--cameras", nargs="+", default=None, help="List of camera names or descriptions to process (e.g. cam1 cam2). If not set, we gather all unique cameras from the dataset.")
     parser.add_argument("--repeat_each_id", type=int, default=1, help="How many times to enqueue each ID in every camera.")
-    parser.add_argument("--threshold", type=int, default=300, help="Ignore classes with numeric ID <= this threshold.")
+    parser.add_argument("--threshold", type=int, default=500, help="Ignore classes with numeric ID <= this threshold.")
     parser.add_argument("--images_per_call", type=int, default=1, help="Number of images generated per pipeline call.")
     parser.add_argument("--model_path", type=str, default="CompVis/stable-diffusion-v1-4", help="Base model path.")
     parser.add_argument("--lora_path", type=str, default='finetune_model/lora_ti/pytorch_lora_weights.safetensors', help="path to lora")
