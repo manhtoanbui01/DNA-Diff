@@ -201,6 +201,10 @@ def build_queue_via_metadata(
             #     continue
             # if class_id not in label2embed:
             #     continue
+            if cam_name in ["cam1", "cam2"] or (cam_name == "cam3" and int(class_id) < 1346):
+                continue
+
+            
             label = class2label[class_id]
             # embeds = label2embed[label]
             
