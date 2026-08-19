@@ -213,8 +213,12 @@ def build_queue_via_metadata(
     all_class_ids = class2label.keys()
     # print("Class to label: ", class2label)
     # print("All class ids: ", all_class_ids)
-    cam_to_num_tokens = {'cam1': 3, 'cam2': 2, 'cam3': 4, 'cam4': 2, 'cam5': 3, 'cam6': 3}
-    cond_market1501_path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/cam7/env301"
+    # cam_to_num_tokens = {'cam1': 3, 'cam2': 2, 'cam3': 4, 'cam4': 2, 'cam5': 3, 'cam6': 3}
+    # cond_market1501_path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/cam7/env301"
+    
+    cam_to_num_tokens = {'cam1': 3, 'cam2': 2, 'cam3': 3, 'cam4': 2, 'cam5': 3, 'cam6': 3}
+    cond_market1501_path = "/data4/toan/projects/DiVE/dataset/NightReID_CUHK03_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity/cam7/env301/"
+    
     # cond_market1501_path = os.path.join(data_dir, "cam7", "env301")
     label2embed = {}
     for identity in os.listdir(cond_market1501_path):
@@ -231,7 +235,7 @@ def build_queue_via_metadata(
 
         cam_desc_str = camera_to_description[cam_name]
         num_cam_token = cam_to_num_tokens[cam_name]
-        possible_envs = [f'env{(int(cam_name[-1])-1) * 15 + i}' for i in range(1,16)]
+        possible_envs = [f'env{(int(cam_name[-1])-1) * 10 + i}' for i in range(1,11)]
         # indices = list(range(1, 11)) + list(range(40, 51))
         # base_offset = (int(cam_name[-1]) - 1) * 50
         # possible_envs = [f'env{base_offset + i}' for i in indices]
