@@ -49,8 +49,6 @@ from diffusers.utils.import_utils import is_xformers_available
 
 from typing import Any, Tuple, Dict
 import kornia
-from torch.utils.tensorboard import SummaryWriter
-
 
 # os.environ["http_proxy"]="http://localhost:8890"
 # os.environ["https_proxy"]="http://localhost:8890"
@@ -75,38 +73,24 @@ def parse_args():
         help="Path to pretrained model or model identifier from huggingface.co/models.",
     )
     parser.add_argument(
+        "--num_env_tokens_per_camera",
+        type=int,
+        default=10,
+        help="Number of environment tokens per camera.",
+    )
+    parser.add_argument(
         "--revision",
         type=str,
         default=None,
         required=False,
         help="Revision of pretrained model identifier from huggingface.co/models.",
     )
-    # parser.add_argument(
-    #     "--dataset_name",
-    #     type=str,
-    #     default='cub',
-    #     help=(
-    #         "The name of the Dataset (from the HuggingFace hub) to train on (could be your own, possibly private,"
-    #         " dataset). It can also be a path pointing to a local copy of a dataset in your filesystem,"
-    #         " or to a folder containing files that 🤗 Datasets can understand."
-    #     ),
-    # )
     parser.add_argument(
         "--dataset_config_name",
         type=str,
         default=None,
         help="The config of the Dataset, leave as None if there's only one config.",
     )
-    # parser.add_argument(
-    #     "--train_data_dir",
-    #     type=str,
-    #     default=None,
-    #     help=(
-    #         "A folder containing the training data. Folder contents must follow the structure described in"
-    #         " https://huggingface.co/docs/datasets/image_dataset#imagefolder. In particular, a `metadata.jsonl` file"
-    #         " must exist to provide the captions for the images. Ignored if `dataset_name` is specified."
-    #     ),
-    # )
     parser.add_argument(
         "--image_column", type=str, default="image", help="The column of the dataset containing an image."
     )
@@ -408,8 +392,6 @@ def main():
     args = parse_args()
     logging_dir = Path(args.output_dir, args.logging_dir)
     
-    writer = SummaryWriter(os.path.join(args.output_dir, "run"))
-
     accelerator_project_config = ProjectConfiguration(project_dir=args.output_dir, logging_dir=logging_dir)
 
     accelerator = Accelerator(
@@ -483,6 +465,7 @@ def main():
     
     with accelerator.main_process_first():        
         train_dataset = PersonHugDatasetForT2I(seed = args.seed,
+                                    num_env_tokens_per_camera = args.num_env_tokens_per_camera,
                                     max_train_samples=args.max_train_samples,
                                     class_prompts_ratio=0.5,  # 50% using env_token only
                                     center_crop = args.center_crop,
@@ -536,7 +519,7 @@ def main():
     cam_to_token_ids = {}
 
     for cam in camera_to_description:
-        ids = tokenizer(camera_to_description[cam])["input_ids"][1:-1]  # remove the begining and ending tokens
+        ids = tokenizer(camera_to_description[cam])["input_ids"][1:-1]  # remove the beginning and ending tokens
         cam_to_token_ids[cam] = ids
     
     
@@ -570,9 +553,9 @@ def main():
     placeholder_env_ids2tokens = {placeholder_env_id:placeholder_env_token for placeholder_env_id, placeholder_env_token in zip(placeholder_env_ids, placeholder_env_tokens)}
     with torch.no_grad(): #placeholder_tokens ['<env_0>', ...'<env_299>', '<env_300>']
         for token_id in placeholder_env_ids:
-            env_token = placeholder_env_ids2tokens[token_id]  # ['<env_1_1>', ...'<env_301_1>', '<env_301_2>']
+            env_token = placeholder_env_ids2tokens[token_id]  # ['<env_1_1>', ...'<env_61_1>', '<env_61_2>']
             env = int(env_token.split('_')[1])
-            cam = f'cam{(env - 1) // 15 + 1}'
+            cam = f'cam{(env - 1) // args.num_env_tokens_per_camera + 1}'
             token_order = int(env_token.strip('<>').split('_')[2])
             initial_id = cam_to_token_ids[cam][token_order-1]
             token_embeds[token_id] = token_embeds[initial_id].clone() 
@@ -954,8 +937,6 @@ def main():
                         logger.info(f"Saved state to {save_path}")
 
             logs = {"step_loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
-            writer.add_scalar("loss/train", loss.detach().item(), global_step)
-            writer.add_scalar("lr", lr_scheduler.get_last_lr()[0], global_step)
             progress_bar.set_postfix(**logs)
 
             if global_step >= args.max_train_steps:

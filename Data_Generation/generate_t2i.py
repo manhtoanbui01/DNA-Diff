@@ -176,6 +176,7 @@ def print_instance_attributes(obj):
  
 def build_queue_via_metadata(
     dataset_obj,
+    cond_daytime_path,
     cameras,
     repeat_each_id,
     threshold,
@@ -213,17 +214,15 @@ def build_queue_via_metadata(
     all_class_ids = class2label.keys()
     # print("Class to label: ", class2label)
     # print("All class ids: ", all_class_ids)
-    # cam_to_num_tokens = {'cam1': 3, 'cam2': 2, 'cam3': 4, 'cam4': 2, 'cam5': 3, 'cam6': 3}
-    # cond_market1501_path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/cam7/env301"
+    # camera_num_tokens = {'cam1': 3, 'cam2': 2, 'cam3': 4, 'cam4': 2, 'cam5': 3, 'cam6': 3}
+    # cond_daytime_path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/cam7/env301"
     
-    cam_to_num_tokens = {'cam1': 3, 'cam2': 2, 'cam3': 3, 'cam4': 2, 'cam5': 3, 'cam6': 3}
-    cond_market1501_path = "/data4/toan/projects/DiVE/dataset/NightReID_CUHK03_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity/cam7/env301/"
-    
-    # cond_market1501_path = os.path.join(data_dir, "cam7", "env301")
+    camera_num_tokens = dataset_obj.camera_num_tokens
+    # cond_daytime_path = os.path.join(data_dir, "cam7", "env301")
     label2embed = {}
-    for identity in os.listdir(cond_market1501_path):
+    for identity in os.listdir(cond_daytime_path):
         label = class2label[str(int(identity))]
-        possible_cond_image_paths = [os.path.join(cond_market1501_path, identity, image) for image in os.listdir(os.path.join(cond_market1501_path, identity))]
+        possible_cond_image_paths = [os.path.join(cond_daytime_path, identity, image) for image in os.listdir(os.path.join(cond_daytime_path, identity))]
         possible_cond_embeds = extract_osnet_embeds(possible_cond_image_paths)
         label2embed[label] = possible_cond_embeds
         
@@ -234,29 +233,18 @@ def build_queue_via_metadata(
             continue
 
         cam_desc_str = camera_to_description[cam_name]
-        num_cam_token = cam_to_num_tokens[cam_name]
-        possible_envs = [f'env{(int(cam_name[-1])-1) * 10 + i}' for i in range(1,11)]
-        # indices = list(range(1, 11)) + list(range(40, 51))
-        # base_offset = (int(cam_name[-1]) - 1) * 50
-        # possible_envs = [f'env{base_offset + i}' for i in indices]
-        
+        num_cam_token = camera_num_tokens[cam_name]
+        possible_envs = [f'env{(int(cam_name[-1])-1) * args.num_env_tokens_per_camera + i}' for i in range(1, args.num_env_tokens_per_camera + 1)]
 
         for class_id in all_class_ids:
             if int(class_id) <= threshold:
                 continue
-            # if int(class_id) not in [501]:
-            #     continue
-            # if cam_name in ["cam1", "cam2", "cam3", "cam4"] or (cam_name == "cam5" and int(class_id) < 1704):
-            #     continue
-            # if class_id not in label2embed:
-            #     continue
             label = class2label[class_id]
             embeds = label2embed[label]
             
 
             start_i = index_counter
             end_i = index_counter + repeat_each_id  # e.g. if repeat_each_id=12, range= [0..12)
-            i_values = list(range(start_i, end_i))
 
             # Chunk them
             for chunk_start in range(start_i, end_i, images_per_call):
@@ -310,6 +298,7 @@ def main(args):
     # Example threshold=1000, repeat_each_id=3, etc.
     build_queue_via_metadata(
         dataset_obj=train_dataset,
+        cond_daytime_path=args.cond_daytime_path,
         cameras=args.cameras,         # e.g. ['cam1','cam2'] or None
         threshold=args.threshold,     # e.g. 1000
         repeat_each_id=args.repeat_each_id,
@@ -359,6 +348,8 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Inference script")
     parser.add_argument("--output_path", type=str, default="outputs", help="Root path for output data.")
+    parser.add_argument("--cond_daytime_path", type=str, default="", help="Root path for output data.")
+    parser.add_argument("--num_env_tokens_per_camera", type=int, default=10, help="Root path for output data.")
     parser.add_argument("--confusion_matrix_path", type=str, default=None, help="Path to a precomputed confusion matrix.")
     parser.add_argument("--seed", type=int, default=0, help="Random seed.")
     parser.add_argument("--examples_per_class", type=int, default=-1, help="Number of examples per class (if applicable).")

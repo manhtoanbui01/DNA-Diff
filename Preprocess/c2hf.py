@@ -6,14 +6,15 @@ import json
 from PIL import Image
 import datasets
 from datasets import Dataset, Features, Image as ImageFeature, Sequence
+from transformers import CLIPTokenizer
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Create a dataset from images and store metadata in dataset.info.description."
     )
-    parser.add_argument("--dataset", type=str, required=True, help="Name/identifier of the dataset (e.g. 'sysu').")
+    parser.add_argument("--dataset", type=str, required=True, help="Name/identifier of the dataset (e.g. 'nightreid').")
     parser.add_argument("--base_path", type=str, required=True, help="Base path to the input dataset.")
-    parser.add_argument("--output_path", type=str, required=True, help="Output path to store the final dataset.")
     parser.add_argument("--num_cameras", type=int, required=True, help="Number of cameras in the dataset.")
     return parser.parse_args()
 
@@ -50,21 +51,6 @@ def generate_unique_descriptions(count):
 
     return codes
 
-# def generate_unique_environment_tokens(count, cam_tokens = None, length=4):
-#     """
-#     Generate `count` unique random alphanumeric tokens of given length.
-#     """
-#     chars = string.ascii_letters + string.digits
-#     tokens = set()
-
-#     while len(tokens) < count:
-#         token = ''.join(random.choices(chars, k=length))
-#         if token in cam_tokens:
-#             continue
-#         tokens.add(token)
-
-#     return list(tokens)
-
     
     
 
@@ -73,14 +59,18 @@ def main():
     # Extract arguments
     current_dataset = args.dataset
     base_path = args.base_path
-    output_path = args.output_path
+    output_path = args.base_path
     num_cameras = args.num_cameras
+    num_night_cameras = num_cameras - 1  # all daytime images are consider captured by the same camera
     
     train_id_path = os.path.join(base_path, "exp", "train_id.txt")
     all_ids = read_ids(train_id_path)
     id_to_label = {f"{int(id_str):04d}": i for i, id_str in enumerate(all_ids)}  # {'0001': 0, '0002': 1, ...}
     
-    
+    tokenizer = CLIPTokenizer.from_pretrained(
+        "runwayml/stable-diffusion-v1-5",
+        subfolder="tokenizer"
+    )
     
     
     # Prepare data
@@ -94,10 +84,6 @@ def main():
     description_to_camera = {desc: f"cam{i}" for i, desc in enumerate(camera_descriptions, 1)}
     
     
-    # environment_descriptions =  generate_unique_environment_tokens(count=301, cam_tokens=camera_to_description.values())
-    # environment_to_description = {f'env{i}': desc for i, desc in enumerate(environment_descriptions, 1)}
-    # description_to_environment = {desc: f'env{i}' for i, desc in enumerate(environment_descriptions, 1)}
-    # print(f"Environment to description: {environment_to_description}")
     
     
     # Saving these mappings to a file
@@ -106,8 +92,6 @@ def main():
         "num_cameras": num_cameras,
         "camera_to_description": camera_to_description,
         "description_to_camera": description_to_camera,
-        # "environment_to_description": environment_to_description,
-        # "description_to_environment": description_to_environment, 
     }
     mapping_file = f"camera_environment_description_mappings_{current_dataset}.json"
     with open(mapping_file, "w") as f:
@@ -116,7 +100,7 @@ def main():
     # choose all images of the same identity with different camera for condition
     def find_possible_cond_images(cam_name, cam_path, identity):
         possible_cond_image_paths = []
-        other_cam_names = [x for x in [f"cam{i+1}" for i in range(8)] if x != cam_name]
+        other_cam_names = [x for x in [f"cam{i+1}" for i in range(num_night_cameras)] if x != cam_name]
         for cond_cam_name in other_cam_names:
             cond_cam_path = os.path.join(os.path.dirname(cam_path), cond_cam_name)
             for env in os.listdir(cond_cam_path):
@@ -129,6 +113,8 @@ def main():
     
     def process_images(camera_path, camera_name):
         description = camera_to_description[camera_name]
+        # token_ids = tokenizer(description, add_special_tokens=False, truncation=False)["input_ids"]
+        # num_camera_tokens = len(token_ids)
         for environment in os.listdir(camera_path):
             # environment_description = environment_to_description[environment]
             environment_path = os.path.join(camera_path, environment)
@@ -149,8 +135,8 @@ def main():
                                 data["cond_image"].append(possible_cond_image_paths)
                                 data["description"].append(description)
                                 data["camera"].append(camera_name)
+                                # data["num_camera_tokens"].append(num_camera_tokens)
                                 data["environment"].append(environment)
-                                # data["environment_description"].append(environment_description)
                             else:
                                 print(f"Skipping image {img_path} due to insufficient height")
                     except Exception as e:
@@ -159,9 +145,10 @@ def main():
                 
     def process_market1501_images(camera_path, camera_name):
         description = camera_to_description[camera_name]
-        # environment_description = environment_to_description['env81']
-        for identity in os.listdir(os.path.join(camera_path, 'env81')):
-            identity_path = os.path.join(camera_path, 'env81', identity)
+        # token_ids = tokenizer(description, add_special_tokens=False, truncation=False)["input_ids"]
+        # num_camera_tokens = len(token_ids)
+        for identity in os.listdir(os.path.join(camera_path, 'env61')):
+            identity_path = os.path.join(camera_path, 'env61', identity)
             for image in os.listdir(identity_path):
                 img_path = os.path.join(identity_path, image)
                 possible_cond_image_paths = [os.path.join(identity_path, img) for img in os.listdir(identity_path) if img != image]
@@ -175,15 +162,14 @@ def main():
                     data["cond_image"].append(possible_cond_image_paths)
                     data["description"].append(description)
                     data["camera"].append(camera_name)
-                    data["environment"].append("env81")
-                    # data["environment_description"].append(environment_description)
-        
+                    # data["num_camera_tokens"].append(num_camera_tokens)
+                    data["environment"].append("env61")
             
     # Process images by environment
     camera_paths = [os.path.join(base_path, f"cam{i}") for i in range(1, num_cameras + 1)]
-    if os.path.join(base_path, "cam9") in camera_paths:
-        camera_paths = [cam for cam in camera_paths if cam != os.path.join(base_path, "cam9")]
-        process_market1501_images(camera_path=os.path.join(base_path, 'cam9'), camera_name='cam9')
+    if os.path.join(base_path, f"cam{num_cameras}") in camera_paths:
+        camera_paths = [cam for cam in camera_paths if cam != os.path.join(base_path, f"cam{num_cameras}")]
+        process_market1501_images(camera_path=os.path.join(base_path, f"cam{num_cameras}"), camera_name=f"cam{num_cameras}")
         
     for i, camera_path in enumerate(camera_paths, 1):
         camera_name = f"cam{i}"
@@ -200,8 +186,8 @@ def main():
                 "cond_image": Sequence(datasets.Value("string")),
                 "description": datasets.Value("string"),
                 "camera": datasets.Value("string"),
+                # "num_camera_tokens": datasets.Value("int32"),
                 "environment": datasets.Value("string"),
-                # "environment_description": datasets.Value("string"),
             }
         )
     )
@@ -211,10 +197,14 @@ def main():
     for cam_name in camera_to_description.keys():
         camera_indices[cam_name] = [i for i,c in enumerate(data['camera']) if c == cam_name]
     
-    # environment_indices = {}
-    # for env_name in environment_to_description.keys():
-    #     environment_indices[env_name] = [i for i,e in enumerate(data['environment']) if e == env_name]
-        
+    camera_num_tokens = {}
+    for cam_name, cam_desc in camera_to_description.items():
+        token_ids = tokenizer(cam_desc, add_special_tokens=False, truncation=False)["input_ids"]
+        num_camera_tokens = len(token_ids)
+        camera_num_tokens[cam_name] = num_camera_tokens
+    
+    
+    
     # Prepare metadata dict
     metadata_dict = {
         "dataset": current_dataset,
@@ -222,9 +212,7 @@ def main():
         "camera_indices": camera_indices,
         "camera_to_description": camera_to_description,
         "description_to_camera": description_to_camera,
-        # "environment_indices": environment_indices,
-        # "environment_to_description": environment_to_description,
-        # "description_to_environment": description_to_environment,
+        "camera_num_tokens": camera_num_tokens,
     }
     
     # Store metadata as JSON in dataset.info.description

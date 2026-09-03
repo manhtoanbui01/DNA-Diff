@@ -3,17 +3,17 @@
 
 function finetune {
     # Default arguments if not provided
-    data_dir=${1:-"/data4/toan/projects/DiVE/dataset/Night600_CUHK03_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity/"}
+    data_dir=${1:-"/data4/toan/projects/DNA-Diff/dataset/NightReID_Market1501/"}
     model_path=${2:-"/data4/toan/projects/DiVE/stable-diffusion-v1-5"}
     output_dir=${3:-"${data_dir%/}/finetune_model/finetune_stage1_dive/"}
-    max_steps=${4:-60000}
+    max_steps=${4:-100000}
     batchsize=${5:-32}
     nepoch=${6:-100}
     rank=${7:-128}
-    checkpointing_steps=${8:-5000}
+    checkpointing_steps=${8:-25000}
     
     # Get GPU IDs - allow it to be passed as 9th parameter or use environment variable
-    gpu_ids=${9:-${GPU_IDS:-5,6}}
+    gpu_ids=${9:-${GPU_IDS:-1,2,3}}
     
     # Set environment variables
     export MODEL_NAME="$model_path"

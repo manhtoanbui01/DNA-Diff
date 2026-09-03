@@ -48,7 +48,6 @@ from diffusers.utils import check_min_version, is_wandb_available
 from diffusers.utils.import_utils import is_xformers_available
 
 from typing import Any, Tuple, Dict
-from torch.utils.tensorboard import SummaryWriter
 
 # os.environ["http_proxy"]="http://localhost:8890"
 # os.environ["https_proxy"]="http://localhost:8890"
@@ -77,32 +76,12 @@ def parse_args():
         required=False,
         help="Revision of pretrained model identifier from huggingface.co/models.",
     )
-    # parser.add_argument(
-    #     "--dataset_name",
-    #     type=str,
-    #     default='cub',
-    #     help=(
-    #         "The name of the Dataset (from the HuggingFace hub) to train on (could be your own, possibly private,"
-    #         " dataset). It can also be a path pointing to a local copy of a dataset in your filesystem,"
-    #         " or to a folder containing files that 🤗 Datasets can understand."
-    #     ),
-    # )
     parser.add_argument(
         "--dataset_config_name",
         type=str,
         default=None,
         help="The config of the Dataset, leave as None if there's only one config.",
     )
-    # parser.add_argument(
-    #     "--train_data_dir",
-    #     type=str,
-    #     default=None,
-    #     help=(
-    #         "A folder containing the training data. Folder contents must follow the structure described in"
-    #         " https://huggingface.co/docs/datasets/image_dataset#imagefolder. In particular, a `metadata.jsonl` file"
-    #         " must exist to provide the captions for the images. Ignored if `dataset_name` is specified."
-    #     ),
-    # )
     parser.add_argument(
         "--image_column", type=str, default="image", help="The column of the dataset containing an image."
     )
@@ -371,8 +350,6 @@ def main():
     args = parse_args()
     logging_dir = Path(args.output_dir, args.logging_dir)
     
-    writer = SummaryWriter(os.path.join(args.output_dir, "run"))
-
     accelerator_project_config = ProjectConfiguration(project_dir=args.output_dir, logging_dir=logging_dir)
 
     accelerator = Accelerator(
@@ -385,7 +362,7 @@ def main():
         if not is_wandb_available():
             raise ImportError("Make sure to install wandb if you want to use it for logging during training.")
         import wandb
-#region Model creation
+    #region Model creation
     # Make one log on every process with the configuration for debugging.
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
@@ -484,7 +461,7 @@ def main():
     index_no_updates[placeholder_token_ids] = False #index_no_updates用来区分可学习的embedding和不可学习的embedding
 
 
-#region add LoRA to unet
+    #region add LoRA to unet
 
     # now we will add new LoRA weights to the attention layers
     # It's important to realize here how many attention weights will be added and of which sizes
@@ -854,8 +831,6 @@ def main():
                         logger.info(f"Saved state to {save_path}")
 
             logs = {"step_loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
-            writer.add_scalar("loss/train", loss.detach().item(), global_step)
-            writer.add_scalar("lr", lr_scheduler.get_last_lr()[0], global_step)
             progress_bar.set_postfix(**logs)
 
             if global_step >= args.max_train_steps:

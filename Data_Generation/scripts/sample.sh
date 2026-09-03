@@ -3,15 +3,18 @@
 
 function sample {
     # Default arguments if not provided
-    data_dir=${1:-"/data4/toan/projects/DiVE/dataset/NightReID_CUHK03_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity/"}
-    model_path=${2:-"/data4/toan/projects/DiVE/stable-diffusion-v1-5"}
-    lora_path=${3:-"finetune_model/lora_ti/pytorch_lora_weights.safetensors"}
-    embed_path=${4:-"finetune_model/lora_ti/learned_embeds-steps-last.bin"}
-    output_dir=${5:-"${data_dir%/}/finetune_model/finetune_stage3_ipadapter/output_step30000_multiple_images"}
-    resolution=${6:-512}
+    data_dir=${1:-"/data4/toan/projects/DNA-Diff/dataset/NightReID_Market1501/"}
+    cond_daytime_path=${2:-"${data_dir%/}/cam7/env61/"}
+    model_path=${3:-"/data4/toan/projects/DiVE/stable-diffusion-v1-5"}
+    lora_path=${4:-"finetune_model/lora_ti/pytorch_lora_weights.safetensors"}
+    embed_path=${5:-"finetune_model/lora_ti/learned_embeds-steps-last.bin"}
+    output_dir=${6:-"${data_dir%/}/finetune_model/finetune_stage3_ipadapter/output_step30000"}
+    num_env_tokens_per_camera=${7:-10}
+    resolution=${8:-512}
     
     echo "Starting image generation with:"
     echo "- Data directory: $data_dir"
+    echo "- Condition daytime images path: $cond_daytime_path"
     echo "- Model path: $model_path"
     echo "- LoRA path: $lora_path" 
     echo "- Embedding path: $embed_path"
@@ -23,10 +26,12 @@ function sample {
     
     python generate_t2i.py \
     --output_path "$output_dir" \
+    --cond_daytime_path "$cond_daytime_path" \
+    --num_env_tokens_per_camera "$num_env_tokens_per_camera" \
     --resolution $resolution \
-    --gpu_ids 0 1 2 3 4  \
+    --gpu_ids 1 2 3  \
     --cameras cam1 cam2 cam3 cam4 cam5 cam6 \
-    --repeat_each_id 7 \
+    --repeat_each_id 3 \
     --batch_size 60 \
     --images_per_call 1 \
     --model_path "$model_path" \

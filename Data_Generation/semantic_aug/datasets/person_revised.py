@@ -4,7 +4,7 @@ import random
 import torch
 # sys.path.append('/data/zhicai/code/Diff-Mix/')
 from semantic_aug.few_shot_dataset import HugFewShotDataset
-from semantic_aug.datasets.utils import IMAGENET_TEMPLATES_DIVE_STEP1, IMAGENET_TEMPLATES_DIVE
+from semantic_aug.datasets.utils import IMAGENET_TEMPLATES
 # from semantic_aug.generative_augmentation import GenerativeAugmentation
 from typing import Any, Tuple, Dict
 # from torch.utils.data import Dataset
@@ -85,6 +85,7 @@ class PersonHugDataset(HugFewShotDataset):
         self.description_to_camera = metadata_dict.get("description_to_camera", {})
         self.environment_to_description = metadata_dict.get("environment_to_description", {})
         self.camera_indices = metadata_dict.get("camera_indices", {})
+        self.camera_num_tokens = metadata_dict.get("camera_num_tokens", {})
 
         # -------------------------------------------
         # (2) Standard RNG, etc.
@@ -332,7 +333,7 @@ class PersonHugDatasetForT2IStep1(torch.utils.data.Dataset):
             content += " person"
 
             # (D) Choose a template. Now each template has form "a {} photo of a {}", etc.
-            template = random.choice(IMAGENET_TEMPLATES_DIVE_STEP1)
+            template = random.choice(IMAGENET_TEMPLATES)
 
             # (E) Fill in two placeholders:
             #     1) the domain description
@@ -357,6 +358,7 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
     def __init__(self, *args, split: str = "train",
                  seed: int = 0, 
                  image_train_dir: str = HUG_LOCAL_IMAGE_TRAIN_DIR, 
+                 num_env_tokens_per_camera: int=10,
                  max_train_samples: int = -1,
                  class_prompts_ratio: float = 1.0, # finetuning stage 2, always use the full image caption
                  resolution: Tuple[int, int] = (512, 256),#int = 512,
@@ -397,38 +399,11 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
         self.class2label = self.dataset.features['label']._str2int
         self.label2class = {v: k for k, v in self.class2label.items()}
         self.num_classes = len(self.class_names)
+        self.num_env_tokens_per_camera = num_env_tokens_per_camera
         self.class_prompts_ratio = class_prompts_ratio
         self.use_placeholder = use_placeholder        
         self.name2placeholder = None
         self.placeholder2name = None
-        
-        cam_to_num_tokens = {}
-        for sample in dataset:
-            camera = sample["camera"]
-            num_tokens = sample["num_camera_tokens"]
-            # keep first occurrence
-            if camera not in cam_to_num_tokens:
-                cam_to_num_tokens[camera] = num_tokens
-        
-        self.cam_to_num_tokens = cam_to_num_tokens
-
-        self.env_names = sorted(
-            list(set(dataset['environment'])), 
-            key=lambda x: int(x.replace('env', ''))
-        )  # [env1, env2, ..., env301]
-        
-        self.environment_names = []
-        # print("env_names: ", self.env_names)
-        for env_name in self.env_names:
-            cam = f'cam{(int(env_name[3:])-1) // 15 + 1}'
-            num_tokens = self.cam_to_num_tokens[cam]
-            for i in range(1, num_tokens+1):
-                self.environment_names.append(f'{env_name}_{i}')
-        
-        self.num_envs = len(self.environment_names)
-        
-        self.env2placeholder = None
-        self.placeholder2env = None        
 
         self.label_to_indices = defaultdict(list)
         for i, label in enumerate(self.dataset['label']):
@@ -464,7 +439,25 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
         self.camera_to_description = metadata_dict.get("camera_to_description", {})
         self.description_to_camera = metadata_dict.get("description_to_camera", {})
         self.camera_indices = metadata_dict.get("camera_indices", {})
+        self.camera_num_tokens = metadata_dict.get("camera_num_tokens", {})
 
+        self.env_names = sorted(
+            list(set(dataset['environment'])), 
+            key=lambda x: int(x.replace('env', ''))
+        )  # [env1, env2, ..., env61]
+        
+        self.environment_names = []
+        # print("env_names: ", self.env_names)
+        for env_name in self.env_names:
+            cam = f'cam{(int(env_name[3:])-1) // self.num_env_tokens_per_camera + 1}'
+            num_tokens = self.camera_num_tokens[cam]
+            for i in range(1, num_tokens+1):
+                self.environment_names.append(f'{env_name}_{i}')
+        
+        self.num_envs = len(self.environment_names)
+        
+        self.env2placeholder = None
+        self.placeholder2env = None        
 
     def __len__(self):
         
@@ -530,8 +523,8 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
             
             # environment = self.env2placeholder[self.dataset[idx]['environment']]
             environment = self.dataset[idx]['environment']
-            cam = f'cam{(int(environment[3:])-1) // 15 + 1}'
-            num_tokens = self.cam_to_num_tokens[cam]
+            cam = f'cam{(int(environment[3:])-1) // self.num_env_tokens_per_camera + 1}'
+            num_tokens = self.camera_num_tokens[cam]
             domain_description = ""
             for i in range(1, num_tokens+1):
                 if i == num_tokens:
@@ -542,15 +535,15 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
         
 
             # (D) Choose a template. Now each template has form "a {} photo of a {}", etc.
-            template = random.choice(IMAGENET_TEMPLATES_DIVE_STEP1)
+            template = random.choice(IMAGENET_TEMPLATES)
 
             prompt = template.format(domain_description, content)
             
             # print(f'Using caption: {prompt}')
         else:
             environment = self.dataset[idx]['environment']
-            cam = f'cam{(int(environment[3:])-1) // 15 + 1}'
-            num_tokens = self.cam_to_num_tokens[cam]
+            cam = f'cam{(int(environment[3:])-1) // self.num_env_tokens_per_camera + 1}'
+            num_tokens = self.camera_num_tokens[cam]
             domain_description = ""
             for i in range(1, num_tokens+1):
                 if i == num_tokens:

@@ -382,7 +382,6 @@ class DreamboothLoraGeneration(GenerativeMixup):
         if self.env2placeholder is not None:
             env_id = self.env2placeholder.get(env_id, env_id)
         cam = metadata.get("camera_name", "")
-        # cam_to_num_tokens = {'cam7': 2, 'cam1': 3, 'cam2': 2, 'cam3': 4, 'cam4': 2, 'cam5': 3, 'cam6': 3}
         num_tokens = metadata.get("num_cam_token", "")
         if cam == "" or num_tokens == "":
             raise ValueError("Error")
@@ -402,10 +401,10 @@ class DreamboothLoraGeneration(GenerativeMixup):
         device = next(self.pipe.unet.parameters()).device
         cond_embed = metadata.get("cond_embed", "").to(device)
         ipadapter_embed = self.image_proj_model(cond_embed)
-        if num_images_per_prompt > 1:
-            ipadapter_embed = ipadapter_embed.repeat_interleave(
-                num_images_per_prompt, dim=0
-            )
+        # if num_images_per_prompt > 1:
+        #     ipadapter_embed = ipadapter_embed.repeat_interleave(
+        #         num_images_per_prompt, dim=0
+        #     )
 
         # Base kwargs
         kwargs = dict(

@@ -50,7 +50,7 @@ IMAGENET_STYLE_TEMPLATES_SMALL = [
     "a large painting in the style of {}",
 ]
 
-IMAGENET_TEMPLATES_DIVE_STEP1 = [
+IMAGENET_TEMPLATES = [
     "a {} photo of a {}",
     "a {} rendering of a {}",
     "a {} cropped photo of the {}",
@@ -78,34 +78,4 @@ IMAGENET_TEMPLATES_DIVE_STEP1 = [
     "a {} photo of the large {}",
     "a {} photo of a cool {}",
     "a {} photo of a small {}",
-]
-
-IMAGENET_TEMPLATES_DIVE = [
-    "a {} photo of a {} in {}",
-    "a {} rendering of a {} in {}",
-    "a {} cropped photo of the {} in {}",
-    "the {} photo of a {} in {}",
-    "a {} photo of a clean {} in {}",
-    "a {} photo of a dirty {} in {}",
-    "a {} dark photo of the {} in {}",
-    "a {} photo of my {} in {}",
-    "a {} photo of the cool {} in {}",
-    "a {} close-up photo of a {} in {}",
-    "a {} bright photo of the {} in {}",
-    "a {} cropped photo of a {} in {}",
-    "a {} photo of the {} in {}",
-    "a {} good photo of the {} in {}",
-    "a {} photo of one {} in {}",
-    "a {} close-up photo of the {} in {}",
-    "a {} rendition of the {} in {}",
-    "a {} photo of the clean {} in {}",
-    "a {} rendition of a {} in {}",
-    "a {} photo of a nice {} in {}",
-    "a {} good photo of a {} in {}",
-    "a {} photo of the nice {} in {}",
-    "a {} photo of the small {} in {}",
-    "a {} photo of the weird {} in {}",
-    "a {} photo of the large {} in {}",
-    "a {} photo of a cool {} in {}",
-    "a {} photo of a small {} in {}",
 ]
