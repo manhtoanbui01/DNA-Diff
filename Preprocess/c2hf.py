@@ -147,8 +147,10 @@ def main():
         description = camera_to_description[camera_name]
         # token_ids = tokenizer(description, add_special_tokens=False, truncation=False)["input_ids"]
         # num_camera_tokens = len(token_ids)
-        for identity in os.listdir(os.path.join(camera_path, 'env61')):
-            identity_path = os.path.join(camera_path, 'env61', identity)
+        environment = os.listdir(camera_path)[0]
+        environment_path = os.path.join(camera_path, environment)
+        for identity in os.listdir(environment_path):
+            identity_path = os.path.join(environment_path, identity)
             for image in os.listdir(identity_path):
                 img_path = os.path.join(identity_path, image)
                 possible_cond_image_paths = [os.path.join(identity_path, img) for img in os.listdir(identity_path) if img != image]

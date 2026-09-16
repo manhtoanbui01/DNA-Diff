@@ -298,7 +298,7 @@ def parse_args():
     parser.add_argument(
         "--resume_from_checkpoint",
         type=str,
-        default="latest",
+        default="",
         help=(
             "Whether training should be resumed from a previous checkpoint. Use a path saved by"
             ' `--checkpointing_steps`, or `"latest"` to automatically select the last available checkpoint.'
@@ -482,10 +482,10 @@ def main():
     # For mixed precision training we cast all non-trainable weigths (vae, non-lora text_encoder and non-lora unet) to half-precision
     # as these weights are only used for inference, keeping weights in full precision is not required.
     weight_dtype = torch.float32
-    # if accelerator.mixed_precision == "fp16":
-    #     weight_dtype = torch.float16
-    # elif accelerator.mixed_precision == "bf16":
-    #     weight_dtype = torch.bfloat16
+    if accelerator.mixed_precision == "fp16":
+        weight_dtype = torch.float16
+    elif accelerator.mixed_precision == "bf16":
+        weight_dtype = torch.bfloat16
 
     # Move unet, vae and text_encoder to device and cast to weight_dtype
     unet.to(accelerator.device, dtype=weight_dtype)
@@ -522,13 +522,13 @@ def main():
         )
     
     # Resize the token embeddings as we are adding new special tokens to the tokenizer
-    text_encoder.resize_token_embeddings(len(tokenizer)) #增加embedding的长度，[49408, 768]->[50814, 768]
+    text_encoder.resize_token_embeddings(len(tokenizer)) 
     
     # Initialise the newly added placeholder token with the embeddings of the initializer token
-    token_embeds = text_encoder.get_input_embeddings().weight.data #[50814, 768]
+    token_embeds = text_encoder.get_input_embeddings().weight.data 
     initializer_token_id = INITIALIZER_TOKEN #42170
-    placeholder_token_ids = tokenizer.convert_tokens_to_ids(placeholder_tokens) #49408, 49409, 49410, 49411, 49412 ... 496607 #正常的embedding到49407结束
-    with torch.no_grad(): #placeholder_tokens ['<class_0>', ...'<class_1404>', '<class_1405>']
+    placeholder_token_ids = tokenizer.convert_tokens_to_ids(placeholder_tokens) 
+    with torch.no_grad(): 
         for token_id in placeholder_token_ids:
             token_embeds[token_id] = token_embeds[initializer_token_id].clone() #把newly added token 赋予INITIALIZER_TOKEN对应的embedding的值   
 
@@ -576,13 +576,13 @@ def main():
     # Resize the token embeddings as we are adding new special tokens to the tokenizer
 
     # Initialise the newly added placeholder token with the embeddings of the initializer token
-    text_encoder.resize_token_embeddings(len(tokenizer)) # [49408, 768]->[50814, 768]
-    token_embeds = text_encoder.get_input_embeddings().weight.data #[50814, 768]
+    text_encoder.resize_token_embeddings(len(tokenizer)) 
+    token_embeds = text_encoder.get_input_embeddings().weight.data
     placeholder_env_ids = tokenizer.convert_tokens_to_ids(placeholder_env_tokens) #49408, 49409, 49410, 49411, 49412 ... 496607 #正常的embedding到49407结束
     placeholder_env_ids2tokens = {placeholder_env_id:placeholder_env_token for placeholder_env_id, placeholder_env_token in zip(placeholder_env_ids, placeholder_env_tokens)}
-    with torch.no_grad(): #placeholder_tokens ['<env_0>', ...'<env_299>', '<env_300>']
+    with torch.no_grad(): #placeholder_tokens ['<env_0>', ...'<env_60>', '<env_61>']
         for token_id in placeholder_env_ids:
-            env_token = placeholder_env_ids2tokens[token_id]  # ['<env_1_1>', ...'<env_301_1>', '<env_301_2>']
+            env_token = placeholder_env_ids2tokens[token_id]  # ['<env_1_1>', ...'<env_61_1>', '<env_61_2>']
             env = int(env_token.split('_')[1])
             cam = f'cam{(env - 1) // args.num_env_tokens_per_camera + 1}'
             token_order = int(env_token.strip('<>').split('_')[2])
@@ -603,13 +603,6 @@ def main():
     text_encoder.requires_grad_(False)
     text_encoder.eval()
     
-    # embedding_layer = text_encoder.get_input_embeddings()
-    # token_id = tokenizer.convert_tokens_to_ids("<env_2_3>")
-    # embedding = embedding_layer.weight[token_id]
-
-    # print("Token ID:", token_id)
-    # print("Embedding:", embedding)
-    # breakpoint()
 
     # Set correct lora layers
     lora_ipadapter_attn_procs = {}
@@ -639,7 +632,7 @@ def main():
             
     unet.set_attn_processor(lora_ipadapter_attn_procs)
     
-    # Load stage 2 Env_Token weight
+    # Load stage 2 weight
     from safetensors.torch import load_file
     ckpt_path = os.path.join(data_dir, "finetune_model", "finetune_stage2_envtoken", "checkpoint-40000", "model.safetensors")
     state_dict = load_file(ckpt_path)
@@ -763,12 +756,6 @@ def main():
         cond_pixel_values = cond_pixel_values.to(memory_format=torch.contiguous_format).float()
         input_ids = tokenize_captions(examples) #'a jCmLmYM5 photo of a <class_599> person'
         
-        # tokens = tokenizer.convert_ids_to_tokens(input_ids[0])
-        # print(tokens)
-        # print(f"input_ids: {input_ids}")
-        
-        # print(f'input_ids: {input_ids.tolist()}')
-        # input_ids = torch.stack([example["input_ids"] for example in input_ids])
         return {"pixel_values": pixel_values, "cond_pixel_values": cond_pixel_values, "input_ids": input_ids}
 
     # DataLoaders creation:
@@ -1008,18 +995,8 @@ def main():
             if global_step >= args.max_train_steps:
                 break
 
-    # Save the lora layers
+
     accelerator.wait_for_everyone()
-    # if accelerator.is_main_process:
-    #     unet = unet.to(torch.float32)
-    #     unet.save_attn_procs(args.output_dir)
-    #     image_proj_model_to_save = accelerator.unwrap_model(image_proj_model)
-    #     torch.save(
-    #         image_proj_model_to_save.state_dict(),
-    #         os.path.join(args.output_dir, "image_proj_model.bin")
-    #     )
-
-
     accelerator.end_training()
     print("All processes finished.")
 

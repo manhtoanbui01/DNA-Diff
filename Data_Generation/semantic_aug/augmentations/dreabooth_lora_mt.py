@@ -104,131 +104,6 @@ def load_diffmix_embeddings_env(embed_path: str,
 
     return env2placeholder, placeholder2env
 
-# def identity(*args):
-#     return args
-
-# class IdentityMap:
-#     def __getitem__(self, key):
-#         return key
-    
-# class DreamboothLoraMixup(GenerativeMixup):
-
-#     pipe = None  # global sharing is a hack to avoid OOM
-
-#     def __init__(self, lora_path: str, 
-#                  model_path: str = "runwayml/stable-diffusion-v1-5",
-#                  embed_path: str = None,
-#                  prompt: str = "a photo of a {name}",
-#                  format_name: Callable = format_name,
-#                  guidance_scale: float = 7.5,
-#                  mask: bool = False,
-#                  inverted: bool = False,
-#                  mask_grow_radius: int = 16,
-#                  disable_safety_checker: bool = True,
-#                  revision: str = None,
-#                  device="cuda", 
-#                  **kwargs):
-
-#         super(DreamboothLoraMixup, self).__init__()
-
-#         if DreamboothLoraMixup.pipe is None:
-
-#             PipelineClass = (StableDiffusionInpaintPipeline 
-#                              if mask else 
-#                              StableDiffusionImg2ImgPipeline)
-
-
-#             DreamboothLoraMixup.pipe = PipelineClass.from_pretrained(
-#                 model_path, use_auth_token=True,
-#                 revision=revision, 
-#                 local_files_only=True,
-#                 torch_dtype=torch.float16
-#             ).to(device)
-
-#             scheduler = DPMSolverMultistepScheduler.from_config(DreamboothLoraMixup.pipe.scheduler.config, local_files_only=True)
-#             self.placeholder2name = None
-#             self.name2placeholder = None
-#             if embed_path is not None:
-#                 self.name2placeholder, self.placeholder2name = load_diffmix_embeddings(embed_path, DreamboothLoraMixup.pipe.text_encoder, DreamboothLoraMixup.pipe.tokenizer)
-#             if lora_path is not None:
-#                 DreamboothLoraMixup.pipe.load_lora_weights(lora_path)
-#             DreamboothLoraMixup.pipe.scheduler = scheduler
- 
-#             print(f"successfuly load lora weights from {lora_path}! ! ! ")
-
-#             logging.disable_progress_bar()
-#             self.pipe.set_progress_bar_config(disable=True)
-
-#             if disable_safety_checker:
-#                 self.pipe.safety_checker = None
-
-#         self.prompt = prompt
-#         self.guidance_scale = guidance_scale
-#         self.format_name = format_name
-
-#         self.mask = mask
-#         self.inverted = inverted
-#         self.mask_grow_radius = mask_grow_radius
-
-#         self.erasure_word_name = None
-
-#     def forward(self, image: Image.Image, label: int, 
-#                 metadata: dict, strength: float=0.5, resolution=512) -> Tuple[Image.Image, int]:
-
-#         canvas = [img.resize((resolution, resolution), Image.BILINEAR) for img in image]
-#         name = metadata.get("name", "") 
-
-#         if self.name2placeholder is not None:
-#             name = self.name2placeholder[name] 
-#         if metadata.get("super_class", None) is not None:
-#             name  = name + ' ' + metadata.get("super_class", "")
-#         prompt = self.prompt.format(name=name)
-
-#         print(prompt)
-
-#         if self.mask: assert "mask" in metadata, \
-#             "mask=True but no mask present in metadata"
-        
-#         # word_name = metadata.get("name", "").replace(" ", "")
-
-#         kwargs = dict(
-#             image=canvas,
-#             prompt=[prompt], 
-#             strength=strength, 
-#             guidance_scale=self.guidance_scale,
-#             num_inference_steps=25,
-#             num_images_per_prompt=len(canvas)
-#         )
-        
-#         if self.mask:  # use focal object mask
-#             mask_image = metadata["mask"].resize((resolution, resolution), Image.NEAREST)
-
-#             mask_image = Image.fromarray(
-#                 maximum_filter(np.array(mask_image), 
-#                                size=self.mask_grow_radius))
-
-#             if self.inverted:
-
-#                 mask_image = ImageOps.invert(
-#                     mask_image.convert('L')).convert('1')
-
-#             kwargs["mask_image"] = mask_image
-
-#         has_nsfw_concept = True
-#         while has_nsfw_concept:
-#             with autocast("cuda"):
-#                 outputs = self.pipe(**kwargs)
-
-#             has_nsfw_concept = (
-#                 self.pipe.safety_checker is not None 
-#                 and outputs.nsfw_content_detected[0]
-#             )
-#         canvas = []
-#         for orig, out in zip(image, outputs.images):
-#             canvas.append(out.resize(orig.size, Image.BILINEAR))
-#         return canvas, label
-
-
 class DreamboothLoraGeneration(GenerativeMixup):
 
     pipe = None  # global sharing is a hack to avoid OOM
@@ -245,6 +120,7 @@ class DreamboothLoraGeneration(GenerativeMixup):
                  disable_safety_checker: bool = True,
                  revision: str = None,
                  device="cuda", 
+                 env_embed_path: str = None,
                  **kwargs):
 
         super(DreamboothLoraGeneration, self).__init__()
@@ -267,7 +143,7 @@ class DreamboothLoraGeneration(GenerativeMixup):
             # embed_path = "/data4/toan/projects/DiVE/dataset/NightReID_DukeMTMC_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage1_dive/learned_embeds-steps-last.bin"
             self.name2placeholder, self.placeholder2name = load_diffmix_embeddings(embed_path, DreamboothLoraGeneration.pipe.text_encoder, DreamboothLoraGeneration.pipe.tokenizer)
             data_dir = os.environ.get("HUG_LOCAL_IMAGE_TRAIN_DIR")
-            embed_path_env = os.path.join(data_dir, 'finetune_model', 'finetune_stage2_envtoken', 'learned_embeds-steps-40000.bin')
+            embed_path_env = env_embed_path or os.path.join(data_dir, 'finetune_model', 'finetune_stage2_envtoken', 'learned_embeds-steps-40000.bin')
             self.env2placeholder, self.placeholder2env = load_diffmix_embeddings_env(embed_path_env, DreamboothLoraGeneration.pipe.text_encoder, DreamboothLoraGeneration.pipe.tokenizer)
             
             # embedding_layer = DreamboothLoraGeneration.pipe.text_encoder.get_input_embeddings()
@@ -364,7 +240,8 @@ class DreamboothLoraGeneration(GenerativeMixup):
         strength: float = 0.5,
         resolution: int = 512,
         num_images_per_prompt: int = 1,
-        seeds: List[int] = None  # <-- new
+        seeds: List[int] = None,  # <-- new
+        extra_pipe_kwargs: dict = None,  # <-- passthrough for visualization hooks
     ) -> List[Image.Image]:
         """
         Generate images from text prompts (metadata) and conditional image (to add more detailed).
@@ -393,50 +270,75 @@ class DreamboothLoraGeneration(GenerativeMixup):
                 env_token = f"<env_{env_id[3:]}_{i}> "
             env_desc += env_token
         
-        # Single prompt string
-        # name = "person"
+
         prompt_str = self.prompt.format(name=name, conditions=env_desc)
         print("Using prompt:", prompt_str)
         
         device = next(self.pipe.unet.parameters()).device
         cond_embed = metadata.get("cond_embed", "").to(device)
         ipadapter_embed = self.image_proj_model(cond_embed)
-        # if num_images_per_prompt > 1:
-        #     ipadapter_embed = ipadapter_embed.repeat_interleave(
-        #         num_images_per_prompt, dim=0
-        #     )
 
-        # Base kwargs
+        if not seeds:
+            # No seeds given => single-seed approach (or random seed from pipeline)
+            # We rely on num_images_per_prompt=N to generate N latents
+            prompt_list = [prompt_str]
+            images_per_prompt = num_images_per_prompt
+            generator = None  # or you can pass one generator if you want reproducibility
+        else:
+            # If we have seeds, we'll create a separate generator for each image
+            if len(seeds) != num_images_per_prompt:
+                raise ValueError(f"Expected {num_images_per_prompt} seeds, got {len(seeds)}")
+
+            # We'll pass the same prompt repeated N times
+            prompt_list = [prompt_str] * num_images_per_prompt
+            images_per_prompt = 1
+            generator = []
+            for seed_val in seeds:
+                gen = torch.Generator(device=self.pipe.device.type)
+                gen.manual_seed(seed_val)
+                generator.append(gen)
+
+        # Append the IP-Adapter tokens to the text embeddings here rather than
+        # passing them into the pipeline. LoRAIPAdapterAttnProcessor splits them
+        # back off at (sequence length - num_tokens), so a stock
+        # StableDiffusionPipeline is all that is needed and the installed
+        # diffusers does not have to be patched.
+        do_cfg = self.guidance_scale > 1.0
+
+        prompt_embeds, negative_prompt_embeds = self.pipe.encode_prompt(
+            prompt_list,
+            device,
+            images_per_prompt,
+            do_cfg,
+        )
+
+        ip = ipadapter_embed.to(prompt_embeds.dtype)
+        if ip.shape[0] != prompt_embeds.shape[0]:
+            ip = ip.expand(prompt_embeds.shape[0], -1, -1)
+
+        prompt_embeds = torch.cat([prompt_embeds, ip], dim=1)
+        if do_cfg:
+            # The unconditional branch gets zeros in the IP-Adapter slots.
+            negative_prompt_embeds = torch.cat(
+                [negative_prompt_embeds, torch.zeros_like(ip)], dim=1
+            )
+
         kwargs = dict(
-            ipadapter_embed=ipadapter_embed,
+            prompt_embeds=prompt_embeds,
+            negative_prompt_embeds=negative_prompt_embeds,
+            # encode_prompt already expanded the batch, so ask for one image each.
+            num_images_per_prompt=1,
+            generator=generator,
             guidance_scale=self.guidance_scale,
             num_inference_steps=50,
             height=resolution,
             width=resolution // 2,
         )
 
-        if not seeds:
-            # No seeds given => single-seed approach (or random seed from pipeline)
-            # We rely on num_images_per_prompt=N to generate N latents
-            kwargs["prompt"] = [prompt_str]
-            kwargs["num_images_per_prompt"] = num_images_per_prompt
-            generator = None  # or you can pass one generator if you want reproducibility
-        else:
-            # If we have seeds, we'll create a separate generator for each image
-            if len(seeds) != num_images_per_prompt:
-                raise ValueError(f"Expected {num_images_per_prompt} seeds, got {len(seeds)}")
-            
-            # We'll pass the same prompt repeated N times
-            prompt_list = [prompt_str] * num_images_per_prompt
-            generator_list = []
-            for seed_val in seeds:
-                gen = torch.Generator(device=self.pipe.device.type)
-                gen.manual_seed(seed_val)
-                generator_list.append(gen)
-            kwargs["prompt"] = prompt_list
-            kwargs["generator"] = generator_list
-            # set num_images_per_prompt=1 for each prompt
-            kwargs["num_images_per_prompt"] = 1
+        # Let a caller attach e.g. callback_on_step_end without having to
+        # re-implement the prompt / env-token / IP-adapter conditioning above.
+        if extra_pipe_kwargs:
+            kwargs.update(extra_pipe_kwargs)
 
         # If you have mask logic, handle it here
         if self.mask:

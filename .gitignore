@@ -5,3 +5,4 @@ dataset/
 Data_Generation/deep_person_reid/
 Data_Generation/ReID_models/
 Data_Generation/AICIty_reID_2020/
+.claude/

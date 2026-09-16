@@ -235,8 +235,8 @@ class LoRAIPAdapterAttnProcessor(torch.nn.Module):
         elif scale == 0:
             skip = True
         if not skip:
-            ip_key = to_k_ip(current_ip_hidden_states)
-            ip_value = to_v_ip(current_ip_hidden_states)
+            ip_key = to_k_ip(current_ip_hidden_states).to(query.dtype)
+            ip_value = to_v_ip(current_ip_hidden_states).to(query.dtype)
             # print(f'current ip hidden state shape: {current_ip_hidden_states.shape}')
             # print(f'attn heads: {attn.heads}, head_dim: {head_dim}')
 

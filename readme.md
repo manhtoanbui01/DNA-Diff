@@ -25,6 +25,8 @@
 
 1. Download SD-1.5 model
 
+2. Download OSNet model
+
 2. Finetune stage 1
    cd Data_Generation
    source script/finetune_stage1.sh

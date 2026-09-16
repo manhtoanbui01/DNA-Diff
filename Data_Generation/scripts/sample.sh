@@ -6,11 +6,9 @@ function sample {
     data_dir=${1:-"/data4/toan/projects/DNA-Diff/dataset/NightReID_Market1501/"}
     cond_daytime_path=${2:-"${data_dir%/}/cam7/env61/"}
     model_path=${3:-"/data4/toan/projects/DiVE/stable-diffusion-v1-5"}
-    lora_path=${4:-"finetune_model/lora_ti/pytorch_lora_weights.safetensors"}
-    embed_path=${5:-"finetune_model/lora_ti/learned_embeds-steps-last.bin"}
-    output_dir=${6:-"${data_dir%/}/finetune_model/finetune_stage3_ipadapter/output_step30000"}
-    num_env_tokens_per_camera=${7:-10}
-    resolution=${8:-512}
+    output_dir=${4:-"${data_dir%/}/finetune_model/finetune_stage3_ipadapter/output_step30000_test"}
+    num_env_tokens_per_camera=${5:-10}
+    resolution=${6:-512}
     
     echo "Starting image generation with:"
     echo "- Data directory: $data_dir"
@@ -19,6 +17,7 @@ function sample {
     echo "- LoRA path: $lora_path" 
     echo "- Embedding path: $embed_path"
     echo "- Output directory: $output_dir"
+    echo "- Number of environment tokens per camera: $num_env_tokens_per_camera"
     echo "- Resolution: $resolution"
     
     # Export the data directory for the Python script to use
