@@ -546,12 +546,12 @@ def main():
     # Resize the token embeddings as we are adding new special tokens to the tokenizer
 
     # Initialise the newly added placeholder token with the embeddings of the initializer token
-    text_encoder.resize_token_embeddings(len(tokenizer)) # [49408, 768]->[50814, 768]
-    token_embeds = text_encoder.get_input_embeddings().weight.data #[50814, 768]
+    text_encoder.resize_token_embeddings(len(tokenizer))
+    token_embeds = text_encoder.get_input_embeddings().weight.data
     # initializer_env_id = INITIALIZER_ENV_TOKEN #42171
-    placeholder_env_ids = tokenizer.convert_tokens_to_ids(placeholder_env_tokens) #49408, 49409, 49410, 49411, 49412 ... 496607 #正常的embedding到49407结束
+    placeholder_env_ids = tokenizer.convert_tokens_to_ids(placeholder_env_tokens) 
     placeholder_env_ids2tokens = {placeholder_env_id:placeholder_env_token for placeholder_env_id, placeholder_env_token in zip(placeholder_env_ids, placeholder_env_tokens)}
-    with torch.no_grad(): #placeholder_tokens ['<env_0>', ...'<env_299>', '<env_300>']
+    with torch.no_grad(): #placeholder_tokens ['<env_0>', ...'<env_299>', '<env_61>']
         for token_id in placeholder_env_ids:
             env_token = placeholder_env_ids2tokens[token_id]  # ['<env_1_1>', ...'<env_61_1>', '<env_61_2>']
             env = int(env_token.split('_')[1])
@@ -561,10 +561,9 @@ def main():
             token_embeds[token_id] = token_embeds[initial_id].clone() 
             # print(f"Load token id {token_id} for token {env_token}, initial with token id {initial_id}")
             
-    index_no_updates = torch.ones((len(tokenizer),), dtype=torch.bool) #[49608] # no update tokens
+    index_no_updates = torch.ones((len(tokenizer),), dtype=torch.bool) 
     index_no_updates[placeholder_env_ids] = False  # update placeholder_env_ids
     
-    # print(f'placeholder_env_ids: {placeholder_env_ids}')
 
 
     # Set correct lora layers
@@ -591,7 +590,6 @@ def main():
     
     # Load stage 1 LoRA weight
     from safetensors.torch import load_file
-    # ckpt_path = "/data4/toan/projects/DiVE/dataset/NightReID_DukeMTMC_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage1_dive/checkpoint-25000/model.safetensors"
     ckpt_path = os.path.join(data_dir, "finetune_model", "finetune_stage1_dive", "checkpoint-100000", "model.safetensors")
     state_dict = load_file(ckpt_path)
     missing, unexpected = unet.load_state_dict(state_dict, strict=False)
@@ -797,12 +795,7 @@ def main():
 
     # keep original embeddings as reference
     orig_embeds_params = accelerator.unwrap_model(text_encoder).get_input_embeddings().weight.data.clone()
-    # embedding_layer = accelerator.unwrap_model(text_encoder).get_input_embeddings()
-    # len_tokenizer = embedding_layer.weight.shape[0]
-    # print(f"Length of tokenizer: {len_tokenizer}")
-    # not_updated_indices = torch.where(index_no_updates)[0]
-    # print("Not updated indices:", not_updated_indices)
-    # import pdb;pdb.set_trace()
+
     for epoch in range(first_epoch, args.num_train_epochs):
         unet.train()
         text_encoder.train()

@@ -218,7 +218,9 @@ def build_queue_via_metadata(
     # cond_daytime_path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/cam7/env301"
     
     camera_num_tokens = dataset_obj.camera_num_tokens
-    # cond_daytime_path = os.path.join(data_dir, "cam7", "env301")
+    if args.use_pretrained_weights:
+        camera_num_tokens = {'cam1': 3, 'cam2': 2, 'cam3': 4, 'cam4': 2, 'cam5': 3, 'cam6': 3}
+        
     label2embed = {}
     for identity in os.listdir(cond_daytime_path):
         label = class2label[str(int(identity))]
@@ -368,6 +370,7 @@ if __name__ == "__main__":
     parser.add_argument("--lora_path", type=str, default='finetune_model/lora_ti/pytorch_lora_weights.safetensors', help="path to lora")
     parser.add_argument("--embed_path", type=str, default='finetune_model/lora_ti/learned_embeds-steps-last.bin', help="path to textual embedding")
     parser.add_argument("--guidance_scale",type=float,default=7.5,help="Guidance scale for classifier-free guidance (how strictly to follow the text prompt, higher = more strict)",)
+    parser.add_argument("--use_pretrained_weights", type=lambda x: x.lower() == "true", default=False, help="Whether to use pretrained weights")
     args = parser.parse_args()
 
     # Please check the corresponding ckpt path before sampling !!! 
