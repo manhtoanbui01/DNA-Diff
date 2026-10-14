@@ -22,23 +22,6 @@ def move_synthetic_data(synthetic_dir, target_dir, ipc: int = 3):  # ipc: number
                 new_name = str(f"{int(real_id):05d}") + f"_c{cam_name}" + "_" + image
                 shutil.copy(os.path.join(synthetic_dir, cam, id, image), os.path.join(target_dir, new_name))
 
-def move_synthetic_data_cuhksysu(synthetic_dir, target_dir, ipc: int = 3):  # ipc: numbers of images per camera per identity
-    id2imgpath = {}
-    for cam in os.listdir(synthetic_dir):
-        for identity in os.listdir(os.path.join(synthetic_dir, cam)):
-            if identity not in id2imgpath:
-                id2imgpath[identity] = []
-            for image in os.listdir(os.path.join(synthetic_dir, cam, identity)):
-                id2imgpath[identity].append(os.path.join(synthetic_dir, cam, identity, image))
-
-    for identity in id2imgpath:
-        random_ipc_images = random.sample(id2imgpath[identity], ipc)
-        new_id = str(int(identity) + 20000)
-        for i, image in enumerate(random_ipc_images):
-            old_name = os.path.basename(image)
-            new_name = str(f"{int(new_id):05d}") + f"_c7_{i}.png"
-            shutil.copy(image, os.path.join(target_dir, new_name))
-
 
 def main():
     parser = argparse.ArgumentParser(description='Move synthetic data to target directory')

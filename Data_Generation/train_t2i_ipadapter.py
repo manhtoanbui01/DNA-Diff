@@ -461,6 +461,15 @@ def main():
     # freeze parameters of models to save more memory
     unet.requires_grad_(False)
     vae.requires_grad_(False)
+    # The vendored deep_person_reid/torchreid/__init__.py does `from torchreid
+    # import ...` (an absolute import), so deep_person_reid/ must itself be on
+    # sys.path for `torchreid` to resolve to the vendored copy. Both paths are
+    # derived from this file's location so the repo works from any checkout and
+    # without installing torchreid into the environment.
+    _DG_DIR = os.path.dirname(os.path.abspath(__file__))
+    for _p in (_DG_DIR, os.path.join(_DG_DIR, "deep_person_reid")):
+        if _p not in sys.path:
+            sys.path.insert(0, _p)
     from deep_person_reid.torchreid.utils import FeatureExtractor
     osnet = FeatureExtractor(
         model_name='osnet_ain_x1_0',
