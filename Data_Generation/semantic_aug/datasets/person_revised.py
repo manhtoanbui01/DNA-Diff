@@ -24,7 +24,7 @@ SUPER_CLASS_NAME = 'person'
 HUG_LOCAL_IMAGE_TEST_DIR = "/root" #not used, doesn't matter
 
 HUG_LOCAL_IMAGE_TRAIN_DIR = os.getenv("HUG_LOCAL_IMAGE_TRAIN_DIR")
-# HUG_LOCAL_IMAGE_TRAIN_DIR = '/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/'
+# HUG_LOCAL_IMAGE_TRAIN_DIR = '/path/to/train/data'
 if HUG_LOCAL_IMAGE_TRAIN_DIR is None:
     raise ValueError("HUG_LOCAL_IMAGE_TRAIN_DIR env variable is not set.")
 
@@ -360,8 +360,8 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
                  image_train_dir: str = HUG_LOCAL_IMAGE_TRAIN_DIR, 
                  num_env_tokens_per_camera: int=10,
                  max_train_samples: int = -1,
-                 class_prompts_ratio: float = 1.0, # finetuning stage 2, always use the full image caption
-                 resolution: Tuple[int, int] = (512, 256),#int = 512,
+                 class_prompts_ratio: float = 1.0, # finetuning stage 2-3, always use the full image caption
+                 resolution: Tuple[int, int] = (512, 256), #int = 512,
                  center_crop: bool = False,
                  random_flip: bool = False,
                  use_placeholder: bool = False,
@@ -562,7 +562,7 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
     
 if __name__== '__main__':
     PLACEHOLDER_ENV_TEMPLATE = '<env_{}_{}>'
-    # HUG_LOCAL_IMAGE_TRAIN_DIR = '/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/'
+    # HUG_LOCAL_IMAGE_TRAIN_DIR = '/path/to/train/data'
     train_dataset = PersonHugDatasetForT2I(class_prompts_ratio=0.5)
     environment_names = train_dataset.environment_names
     placeholder_env_tokens = []

@@ -48,7 +48,6 @@ from diffusers.utils import check_min_version, is_wandb_available
 from diffusers.utils.import_utils import is_xformers_available
 
 from typing import Any, Tuple, Dict
-import kornia
 
 # os.environ["http_proxy"]="http://localhost:8890"
 # os.environ["https_proxy"]="http://localhost:8890"
@@ -57,6 +56,7 @@ from semantic_aug.datasets.person_revised import PersonHugDatasetForT2I
 # check_min_version("0.21.0.dev0")
 
 logger = get_logger(__name__, log_level="INFO")
+from train_common import save_progress_env as save_progress
 
 PLACEHOLDER_TOKEN_TEMPLATE = '<class_{}>'
 PLACEHOLDER_ENV_TEMPLATE = '<env_{}_{}>'
@@ -338,53 +338,8 @@ def parse_args():
 
     return args
 
-def preprocess(x):
-    dtype = x.dtype
-    x = kornia.geometry.resize(x.to(torch.float32), (256, 128), interpolation='bicubic', align_corners=True, antialias=False).to(dtype=dtype)   # not bf16
-    x = (x + 1.) / 2.  # [-1,1] -> [0,1]
-    x = x.clamp(0, 1)
-    x = kornia.enhance.normalize(x, torch.Tensor([0.485, 0.456, 0.406]),
-                                 torch.Tensor([0.229, 0.224, 0.225]))
-    return x
 
-def extract_features(model, image_tensor):
-    """
-    Extract osnet features from a tensor.
 
-    Args:
-        model: osnet model
-        image_tensor: torch.Tensor of shape [B, 3, H, W] or [3, H, W] in range [-1,1]
-        transform: optional torchvision transform to preprocess image_tensor
-
-    Returns:
-        features: torch.Tensor of shape [B, D]
-    """
-
-    image_tensor = preprocess(image_tensor)
-
-    # Ensure batch dimension
-    if image_tensor.dim() == 3:
-        image_tensor = image_tensor.unsqueeze(0)  # [1, 3, H, W]
-
-    image_tensor = image_tensor.cuda()
-    # image_tensor = image_tensor.to(dtype=next(model.parameters()).dtype)
-
-    features = model(image_tensor)  # [B, D]
-
-    return features
-
-def save_progress(text_encoder, placeholder_env_ids, accelerator, args, env2placeholder, placeholder2env, save_path):
-    logger.info("Saving embeddings")
-    learned_embeds = (
-        accelerator.unwrap_model(text_encoder)
-        .get_input_embeddings()
-        .weight[placeholder_env_ids]
-    )
-    learned_embeds_dict = {}
-    for learned_embed, (env, placeholder) in zip(learned_embeds, env2placeholder.items()):
-        learned_embeds_dict[placeholder] = learned_embed
-    
-    torch.save(dict(learned_embeds_dict = learned_embeds_dict, env2placeholder=env2placeholder, placeholder2env=placeholder2env), save_path)
 
 
 def main():

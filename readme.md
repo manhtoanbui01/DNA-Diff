@@ -27,7 +27,6 @@ follows the same convention: `finetune_stage1_ila/`, `finetune_stage2_envtoken/`
 ```
 DNA-Diff/
 ├── environment.yml                 # conda environment (primary install path)
-├── requirements.txt                # pip-only equivalent
 ├── Preprocess/
 │   ├── group_by_lighting.py        # split NightReID by brightness into env groups
 │   ├── market2nightreid.py         # append Market-1501 as the daytime camera
@@ -36,6 +35,7 @@ DNA-Diff/
 │   ├── train_t2i_ila.py           # stage 1
 │   ├── train_t2i_envtoken.py       # stage 2
 │   ├── train_t2i_ipadapter.py      # stage 3
+│   ├── train_common.py             # helpers shared by the three stages
 │   ├── lora_ipadapter.py           # IP-Adapter attention processors / projection
 │   ├── generate_t2i.py             # inference
 │   ├── semantic_aug/               # dataset + augmentation/pipeline wrappers
@@ -81,16 +81,6 @@ cd DNA-Diff
 conda env create -f environment.yml
 conda activate dna-diff
 ```
-
-<details>
-<summary>pip-only alternative</summary>
-
-```bash
-python3.10 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-</details>
 
 > `diffusers` is pinned to **0.23.1**. The training scripts subclass the LoRA
 > attention processors from that release; later versions relocate them and the
@@ -340,23 +330,25 @@ sample \
 `cond_daytime_path` is the **daytime camera folder** (`cam7/env61/`) whose
 crops provide the OSNet identity embeddings.
 
-Key `generate_t2i.py` flags (edit them in `scripts/sample.sh`):
+Key `generate_t2i.py` flags. These are no longer hardcoded — each is
+`sample` argument 8-13, or the environment variable in brackets
+(`DEBUG=1` for single-process):
 
 | Flag | Default in `sample.sh` | Meaning |
 | --- | --- | --- |
-| `--cameras` | `cam1 … cam6` | target night-time cameras |
-| `--gpu_ids` | `1 2 3` | one worker process per GPU |
-| `--batch_size` | `60` | queue items pulled per pipeline call |
-| `--repeat_each_id` | `3` | how many times each identity is enqueued per camera |
-| `--images_per_call` | `1` | images generated per pipeline call |
-| `--guidance_scale` | `7.5` | classifier-free guidance strength |
+| `--cameras` (`CAMERAS`) | `cam1 … cam6` | target night-time cameras |
+| `--gpu_ids` (`GPU_IDS`) | `1 2 3` | one worker process per GPU |
+| `--batch_size` (`BATCH_SIZE`) | `60` | queue items pulled per pipeline call |
+| `--repeat_each_id` (`REPEAT_EACH_ID`) | `3` | how many times each identity is enqueued per camera |
+| `--images_per_call` (`IMAGES_PER_CALL`) | `1` | images generated per pipeline call |
+| `--guidance_scale` (`GUIDANCE_SCALE`) | `7.5` | classifier-free guidance strength |
 | `--threshold` | `500` | identities with numeric id ≤ this are ignored |
 | `--resolution` | `512` | output size |
-| `--debug` | off | single-process mode, easier to trace |
+| `--debug` (`DEBUG`) | off | single-process mode, easier to trace |
 
-`--lora_path` and `--embed_path` are accepted but unused — the LoRA checkpoint
-and the learned embeddings are resolved from `HUG_LOCAL_IMAGE_TRAIN_DIR` (see
-§5.4).
+`--threshold` is the one flag `sample.sh` does not expose; it falls back to the
+argparse default. The LoRA checkpoint and learned embeddings are resolved from
+`HUG_LOCAL_IMAGE_TRAIN_DIR` (see §5.4), not from arguments.
 
 Images are written as:
 

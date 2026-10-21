@@ -56,6 +56,7 @@ from semantic_aug.datasets.person_revised import PersonHugDatasetForT2IStep1
 # check_min_version("0.21.0.dev0")
 
 logger = get_logger(__name__, log_level="INFO")
+from train_common import save_progress
 
 PLACEHOLDER_TOKEN_TEMPLATE = '<class_{}>'
 INITIALIZER_TOKEN = 42170
@@ -330,18 +331,6 @@ def parse_args():
     return args
 
 
-def save_progress(text_encoder, placeholder_token_ids, accelerator, args, name2placeholder, placeholder2name, save_path):
-    logger.info("Saving embeddings")
-    learned_embeds = (
-        accelerator.unwrap_model(text_encoder)
-        .get_input_embeddings()
-        .weight[placeholder_token_ids]
-    )
-    learned_embeds_dict = {}
-    for learned_embed, (name, placeholder) in zip(learned_embeds, name2placeholder.items()):
-        learned_embeds_dict[placeholder] = learned_embed
-    
-    torch.save(dict(learned_embeds_dict = learned_embeds_dict, name2placeholder=name2placeholder, placeholder2name=placeholder2name), save_path)
 
 
 
