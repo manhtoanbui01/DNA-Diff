@@ -248,7 +248,7 @@ GPU_IDS="0,1,2" bash scripts/finetune_all.sh \
     /abs/path/to/stable-diffusion-v1-5
 ```
 
-Positional arguments: `data_dir  model_path  steps  batchsize  nepoch  rank  gpu_ids`
+Positional arguments: `steps`, `batchsize`, `nepoch`, `rank`, `gpu_ids`
 (defaults: `"1 2 3"`, `32`, `100`, `128`, `1,2,3`).
 
 Useful environment variables:
@@ -301,16 +301,67 @@ dataset/NightReID_Market1501/finetune_model/
 Each stage loads the previous stage's weights from paths that embed the
 previous stage's **step count**:
 
-| File                                      | Line          | Expects                                                                                                                                                                         |
-| ----------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `train_t2i_envtoken.py`                   | 507, 593      | `finetune_stage1_ila/learned_embeds-steps-100000.bin`, `finetune_stage1_ila/checkpoint-100000/model.safetensors`                                                                |
-| `train_t2i_ipadapter.py`                  | 546, 602, 646 | `finetune_stage1_ila/learned_embeds-steps-100000.bin`, `finetune_stage2_envtoken/learned_embeds-steps-40000.bin`, `finetune_stage2_envtoken/checkpoint-40000/model.safetensors` |
-| `generate_t2i.py`                         | 89, 91        | `finetune_stage3_ipadapter/checkpoint-30000`, `finetune_stage1_ila/learned_embeds-steps-100000.bin`                                                                             |
-| `semantic_aug/datasets/person_revised.py` | 512           | `finetune_stage1_ila/learned_embeds-steps-100000.bin`                                                                                                                           |
+| File                                              | Line          | Expects                                                                                                                                                                         |
+| ------------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `train_t2i_envtoken.py`                           | 507, 593      | `finetune_stage1_ila/learned_embeds-steps-100000.bin`, `finetune_stage1_ila/checkpoint-100000/model.safetensors`                                                                |
+| `train_t2i_ipadapter.py`                          | 546, 602, 646 | `finetune_stage1_ila/learned_embeds-steps-100000.bin`, `finetune_stage2_envtoken/learned_embeds-steps-40000.bin`, `finetune_stage2_envtoken/checkpoint-40000/model.safetensors` |
+| `generate_t2i.py`                                 | 89, 91        | `finetune_stage3_ipadapter/checkpoint-30000`, `finetune_stage1_ila/learned_embeds-steps-100000.bin`                                                                             |
+| `semantic_aug/datasets/person_revised.py`         | 512           | `finetune_stage1_ila/learned_embeds-steps-100000.bin`                                                                                                                           |
+| `semantic_aug/augmentations/dreabooth_lora_mt.py` | 142           | `finetune_stage2_envtoken/learned_embeds-steps-40000.bin`                                                                                                                       |
 
 If you change `STEP*_MAX_STEPS`, update these paths too. `finetune_all.sh`
 prints a warning when the schedules and the hard-coded paths diverge, but it
 cannot fix them.
+
+### 5.5 Using published pretrained weights (skip training)
+
+If you only want to generate images, you can skip §5 entirely and download the
+released weights instead.
+
+**Download:** _to be published — link TBA._
+
+Inference reads exactly four files. Unpack them under your `data_dir` at these
+paths, which are hard-coded (§5.4):
+
+```
+dataset/NightReID_Market1501/finetune_model/
+├── finetune_stage1_ila/
+│   └── learned_embeds-steps-100000.bin          6.2 MB   identity token embeddings
+├── finetune_stage2_envtoken/
+│   └── learned_embeds-steps-40000.bin           540 KB   env (lighting) token embeddings
+└── finetune_stage3_ipadapter/
+    └── checkpoint-30000/
+        ├── model.safetensors                    171 MB   UNet LoRA + IP-Adapter attn
+        └── model_1.safetensors                  6.1 MB   OSNet → IP-Adapter projection
+```
+
+Only these four are needed — the `optimizer.bin` and text-encoder
+shards inside each checkpoint exist for resuming training, not inference. You
+also need the base SD-1.5 model (§3.4) and the OSNet checkpoint (§3.3).
+
+Then run generation as in §6.
+
+> **⚠️ The weights are tied to one specific dataset build.** > `Preprocess/c2hf.py` assigns each camera a _random_ 4-character pseudo-word on
+> every run (`generate_unique_descriptions()`, unseeded). How many CLIP tokens
+> that word splits into decides how many `<env_{N}_{i}>` tokens exist per camera
+> — and those are what the released weights were trained on.
+>
+> So re-running §4.4 yourself produces a different mapping, and the released
+> embeddings will not line up with your prompts. Use the
+> `camera_environment_description_mappings_<dataset>.json` published alongside
+> the weights, rather than regenerating one.
+
+> **On `use_pretrained_weights`** (argument 7 of `sample`, default `false`):
+> setting it `true` replaces the per-camera token counts read from your dataset
+> metadata with a fixed `{cam1:3, cam2:2, cam3:4, cam4:2, cam5:3, cam6:3}`.
+> Those counts are simply the ones from one particular run of `c2hf.py`. Since
+> the camera pseudo-words are regenerated at random on every run, the counts
+> change from run to run — the build described above, for instance, gives
+> `3, 2, 2, 3, 2, 3`. Set it `true` when you are using the published pretrained
+> weights; set it `false` when you are using weights you trained yourself, so
+> the counts come from your own dataset metadata.
+
+---
 
 ---
 
@@ -324,33 +375,7 @@ sample \
     /abs/path/to/dataset/NightReID_Market1501/cam7/env61/ \
     /abs/path/to/stable-diffusion-v1-5 \
     /abs/path/to/output_dir \
-    10 512 false
 ```
-
-`sample` takes
-`data_dir  cond_daytime_path  model_path  output_dir  num_env_tokens_per_camera  resolution  use_pretrained_weights`.
-`cond_daytime_path` is the **daytime camera folder** (`cam7/env61/`) whose
-crops provide the OSNet identity embeddings.
-
-Key `generate_t2i.py` flags. These are no longer hardcoded — each is
-`sample` argument 8-13, or the environment variable in brackets
-(`DEBUG=1` for single-process):
-
-| Flag                                    | Default in `sample.sh` | Meaning                                             |
-| --------------------------------------- | ---------------------- | --------------------------------------------------- |
-| `--cameras` (`CAMERAS`)                 | `cam1 … cam6`          | target night-time cameras                           |
-| `--gpu_ids` (`GPU_IDS`)                 | `1 2 3`                | one worker process per GPU                          |
-| `--batch_size` (`BATCH_SIZE`)           | `60`                   | queue items pulled per pipeline call                |
-| `--repeat_each_id` (`REPEAT_EACH_ID`)   | `3`                    | how many times each identity is enqueued per camera |
-| `--images_per_call` (`IMAGES_PER_CALL`) | `1`                    | images generated per pipeline call                  |
-| `--guidance_scale` (`GUIDANCE_SCALE`)   | `7.5`                  | classifier-free guidance strength                   |
-| `--threshold`                           | `500`                  | identities with numeric id ≤ this are ignored       |
-| `--resolution`                          | `512`                  | output size                                         |
-| `--debug` (`DEBUG`)                     | off                    | single-process mode, easier to trace                |
-
-`--threshold` is the one flag `sample.sh` does not expose; it falls back to the
-argparse default. The LoRA checkpoint and learned embeddings are resolved from
-`HUG_LOCAL_IMAGE_TRAIN_DIR` (see §5.4), not from arguments.
 
 Images are written as:
 
@@ -420,5 +445,4 @@ The step counts in the hard-coded paths do not match what you trained. See §5.4
 `GPU_IDS` and `CUDA_VISIBLE_DEVICES` are both set. Use only `GPU_IDS`.
 
 **OOM during training**
-Lower `batchsize` (arg 5 of `finetune`) and/or `rank` (arg 7); `rank=128` with
-`batchsize=32` needs roughly 24 GB per GPU.
+Lower `batchsize` (arg 5 of `finetune`) and/or `rank` (arg 7)
