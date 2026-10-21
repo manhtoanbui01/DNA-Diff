@@ -3,9 +3,9 @@
 
 function sample {
     # Default arguments if not provided
-    data_dir=${1:-"/data4/toan/projects/DNA-Diff/dataset/NightReID_Market1501/"}
+    data_dir=${1:-"../dataset/NightReID_Market1501/"}
     cond_daytime_path=${2:-"${data_dir%/}/cam7/env61/"}
-    model_path=${3:-"/data4/toan/projects/DiVE/stable-diffusion-v1-5"}
+    model_path=${3:-"../stable-diffusion-v1-5"}
     output_dir=${4:-"${data_dir%/}/finetune_model/finetune_stage3_ipadapter/output_step30000_test"}
     num_env_tokens_per_camera=${5:-10}
     resolution=${6:-512}

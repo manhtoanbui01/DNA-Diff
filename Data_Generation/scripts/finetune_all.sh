@@ -21,8 +21,8 @@ WORK_DIR="$(dirname "$SCRIPTS_DIR")"
 
 function finetune_all {
     # Default arguments if not provided
-    data_dir=${1:-"/data4/toan/projects/DNA-Diff/dataset/NightReID_Market1501/"}
-    model_path=${2:-"/data4/toan/projects/DiVE/stable-diffusion-v1-5"}
+    data_dir=${1:-"../dataset/NightReID_Market1501/"}
+    model_path=${2:-"../stable-diffusion-v1-5"}
     steps=${3:-${STEPS:-"1 2 3"}}
     batchsize=${4:-32}
     nepoch=${5:-100}

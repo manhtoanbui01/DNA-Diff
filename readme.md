@@ -57,7 +57,7 @@ Everything under `dataset/`, `Data_Generation/deep_person_reid/`,
 ## 2. Requirements
 
 - Linux x86_64
-- NVIDIA GPU(s) — training was done on **3 × 24 GB** GPUs with `batch_size=32`,
+- NVIDIA GPU(s) — training was done on **3** GPUs with `batch_size=32` each GPU,
   LoRA `rank=128`, fp16
 - NVIDIA driver supporting CUDA 12.1 or newer (the CUDA runtime ships with the
   PyTorch wheels; no system CUDA toolkit is required)
@@ -71,7 +71,7 @@ Everything under `dataset/`, `Data_Generation/deep_person_reid/`,
 ### 3.1 Clone the repository
 
 ```bash
-git clone <this-repo> DNA-Diff
+git clone https://github.com/manhtoanbui01/DNA-Diff.git DNA-Diff
 cd DNA-Diff
 ```
 
@@ -86,13 +86,48 @@ conda activate dna-diff
 > attention processors from that release; later versions relocate them and the
 > import will fail.
 
-Configure `accelerate` once (choose multi-GPU, fp16):
+<!-- Configure `accelerate` once (choose multi-GPU, fp16):
 
 ```bash
 accelerate config
+``` -->
+
+### 3.3 Download Stable Diffusion v1.5
+
+```bash
+pip install huggingface_hub
 ```
 
-### 3.3 Provide the OSNet ReID backbone
+Log in to Hugging Face:
+
+```bash
+huggingface-cli login
+```
+
+Go to <https://huggingface.co/settings/tokens>, generate a new personal access
+token, and use it when prompted by `huggingface-cli login`.
+
+Download the model:
+
+```bash
+huggingface-cli download stable-diffusion-v1-5/stable-diffusion-v1-5 --local-dir ./stable-diffusion-v1-5
+```
+
+> **Attention:** add `--local-dir-use-symlinks False` to download directly to
+> the given path.
+
+The scripts run with `--local_files_only`, so the model must be on disk. Note
+its path — it is passed as `model_path` to every script below.
+
+Change directory to:
+
+```bash
+cd Data_Generation
+```
+
+### 3.4 Provide the OSNet ReID backbone
+
+The commands in this section run from `Data_Generation/`, where §3.3 left you.
 
 Stage 3 and inference extract identity features with OSNet from a **vendored,
 locally modified** copy of
@@ -107,12 +142,21 @@ at `Data_Generation/deep_person_reid/`.
 > carried by the repository — if you are setting this up on a new machine, copy
 > `Data_Generation/deep_person_reid/` across from an existing checkout.
 
-Place the **`osnet_ain_x1_0`** multi-source checkpoint (`MS -> D+M`, from the
+If you have no copy to hand and must clone it, **clone into a folder named with
+underscores** — the code does `from deep_person_reid.torchreid.utils import ...`,
+and a plain `git clone` would create `deep-person-reid`, which is not a valid
+Python package name:
+
+```bash
+git clone https://github.com/KaiyangZhou/deep-person-reid.git deep_person_reid
+```
+
+Place the **`osnet_ain_x1_0`** multi-source checkpoint (`MS+D+M->C`, from the
 [torchreid model zoo](https://kaiyangzhou.github.io/deep-person-reid/MODEL_ZOO.html))
 at exactly:
 
 ```
-Data_Generation/deep_person_reid/osnet_ain_ms_d_m.pth.tar
+deep_person_reid/osnet_ain_ms_d_m.pth.tar
 ```
 
 **No installation step is required.** `generate_t2i.py` and
@@ -128,16 +172,6 @@ a misconfigured path and silently mixes two different copies of the library.
 The OSNet checkpoint path above is **relative to the working directory**, so all
 training and generation commands must still be run from inside
 `Data_Generation/`.
-
-### 3.4 Download Stable Diffusion v1.5
-
-```bash
-git lfs install
-git clone https://huggingface.co/runwayml/stable-diffusion-v1-5
-```
-
-The scripts run with `--local_files_only`, so the model must be on disk. Note
-its path — it is passed as `model_path` to every script below.
 
 ---
 
@@ -244,8 +278,8 @@ environment variable, which the shell wrappers set for you. Run everything from
 ```bash
 cd Data_Generation
 GPU_IDS="0,1,2" bash scripts/finetune_all.sh \
-    /abs/path/to/DNA-Diff/dataset/NightReID_Market1501/ \
-    /abs/path/to/stable-diffusion-v1-5
+    ../dataset/NightReID_Market1501/ \
+    ../stable-diffusion-v1-5
 ```
 
 Positional arguments: `steps`, `batchsize`, `nepoch`, `rank`, `gpu_ids`
@@ -270,17 +304,31 @@ needs, and logs to `<data_dir>/finetune_model/logs/stepN_<timestamp>.log`.
 
 ### 5.2 Run a single stage
 
+Use the same `finetune_all.sh`, just narrowing `steps` — either as the `STEPS`
+environment variable or as the third positional argument:
+
 ```bash
 cd Data_Generation
-source scripts/finetune_step1.sh      # defines finetune()
-GPU_IDS="0,1,2" finetune \
-    /abs/path/to/dataset/NightReID_Market1501/ \
-    /abs/path/to/stable-diffusion-v1-5
+
+STEPS="1"   bash scripts/finetune_all.sh      # stage 1 only
+STEPS="2"   bash scripts/finetune_all.sh      # stage 2 only
+STEPS="2 3" bash scripts/finetune_all.sh      # stages 2 and 3
+
+bash scripts/finetune_all.sh "" "" "2"        # same thing, 3rd positional
 ```
 
-`finetune` takes
-`data_dir  model_path  output_dir  max_steps  batchsize  nepoch  rank  checkpointing_steps  gpu_ids`.
-The same applies to `finetune_step2.sh` and `finetune_step3.sh`.
+Every other argument and environment variable from §5.1 still applies, so
+`GPU_IDS="0,1,2" STEPS="2" bash scripts/finetune_all.sh` works as expected.
+
+Stages 2 and 3 are not standalone — they load the previous stage's weights.
+`finetune_all.sh` checks for them first and stops with
+_"Run step 1 first, or add it to STEPS"_ rather than failing part-way into
+training, so a missing prerequisite costs you seconds, not hours.
+
+> **Re-running a finished stage resumes, it does not restart.** > `--resume_from_checkpoint` defaults to `"latest"`, so the script finds the
+> existing checkpoint, loads it, and exits almost immediately because
+> `global_step` already equals `max_train_steps`. To genuinely retrain a stage,
+> move its output directory aside first, or point `output_dir` somewhere new.
 
 ### 5.3 Outputs
 
@@ -337,9 +385,23 @@ dataset/NightReID_Market1501/finetune_model/
 
 Only these four are needed — the `optimizer.bin` and text-encoder
 shards inside each checkpoint exist for resuming training, not inference. You
-also need the base SD-1.5 model (§3.4) and the OSNet checkpoint (§3.3).
+also need the base SD-1.5 model (§3.3) and the OSNet checkpoint (§3.4).
 
-Then run generation as in §6.
+Then run generation as in §6, but pass `true` as the **7th argument**
+(`use_pretrained_weights`) — this is the one difference from generating with
+weights you trained yourself:
+
+```bash
+cd Data_Generation
+source scripts/sample.sh
+sample \
+    /abs/path/to/dataset/NightReID_Market1501/ \
+    /abs/path/to/dataset/NightReID_Market1501/cam7/env61/ \
+    /abs/path/to/stable-diffusion-v1-5 \
+    /abs/path/to/output_dir \
+    10 512 true
+#          ^^^^ use_pretrained_weights
+```
 
 > **⚠️ The weights are tied to one specific dataset build.** > `Preprocess/c2hf.py` assigns each camera a _random_ 4-character pseudo-word on
 > every run (`generate_unique_descriptions()`, unseeded). How many CLIP tokens
@@ -390,15 +452,20 @@ Images are written as:
 Flatten the generated tree into Market-1501 filename conventions
 (`<id+10000:05d>_c<cam>_<orig>.jpg`, 3 images per camera per identity):
 
+Copy them straight into the NightReID training split, so the synthetic images
+sit alongside the real night-time ones:
+
 ```bash
-mkdir -p /path/to/market_style_output
 python move_synthetic_market1501.py \
     -i /abs/path/to/output_dir \
-    -o /path/to/market_style_output
+    -o /path/to/NightReID/bounding_box_train/
 ```
 
-The result can be merged into a Market-1501 `bounding_box_train` folder and
-used to train any downstream ReID model.
+The target directory must already exist — the script only copies into it, it
+does not create it. Train any downstream ReID model on that folder as usual.
+
+> Synthetic identities are offset by **+10000**, so they cannot collide with the
+> real NightReID identities (which top out around 1500).
 
 ---
 
@@ -423,7 +490,7 @@ You ran a training/generation script directly. Use the wrappers in
 `Data_Generation/scripts/`, or `export HUG_LOCAL_IMAGE_TRAIN_DIR=/abs/path/to/dataset/NightReID_Market1501/`.
 
 **`FileNotFoundError: deep_person_reid/osnet_ain_ms_d_m.pth.tar`**
-The OSNet path is relative — run from `Data_Generation/`, and check §3.3.
+The OSNet path is relative — run from `Data_Generation/`, and check §3.4.
 
 **`ModuleNotFoundError: No module named 'torchreid'`**
 Raised from `deep_person_reid/torchreid/__init__.py`, which imports `torchreid`
@@ -433,7 +500,7 @@ if you run them from outside `Data_Generation/` or import them from your own
 code. Fix it with
 `export PYTHONPATH="$PWD:$PWD/deep_person_reid:$PYTHONPATH"` from
 `Data_Generation/`. Installing PyPI `torchreid` also makes the error go away,
-but it is the wrong package — see §3.3.
+but it is the wrong package — see §3.4.
 
 **`ImportError` from `diffusers.models.attention_processor`**
 `diffusers` is not at 0.23.1. Reinstall with `pip install diffusers==0.23.1`.
