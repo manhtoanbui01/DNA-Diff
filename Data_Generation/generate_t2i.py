@@ -207,10 +207,8 @@ def build_queue_via_metadata(
     :param threshold: Numeric threshold for filtering class IDs (e.g. only > threshold).
     :param in_queue: Queue for multiprocessing tasks.
     """
-    # import pdb; pdb.set_trace()
     camera_to_description = dataset_obj.camera_to_description  # e.g. {"cam1": "ABCD1234", ...}                 # e.g. {0: "class_0", 1: "class_1", ...}
     class2label = dataset_obj.class2label 
-    # environment_to_description = dataset_obj.environment_to_description
     # If user doesn't specify cameras, gather them from camera_to_description
     if not cameras:
         cameras = sorted(camera_to_description.keys())
@@ -220,10 +218,6 @@ def build_queue_via_metadata(
 
     # Sort class IDs so you process them in ascending order
     all_class_ids = class2label.keys()
-    # print("Class to label: ", class2label)
-    # print("All class ids: ", all_class_ids)
-    # camera_num_tokens = {'cam1': 3, 'cam2': 2, 'cam3': 4, 'cam4': 2, 'cam5': 3, 'cam6': 3}
-    # cond_daytime_path = "/data4/toan/projects/DiVE/dataset/NightReID_Market1501_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/cam7/env301"
     
     camera_num_tokens = dataset_obj.camera_num_tokens
     if args.use_pretrained_weights:

@@ -1,9 +1,4 @@
 """Helpers shared by the three training stages.
-
-These functions were duplicated verbatim across train_t2i_ila.py,
-train_t2i_envtoken.py and train_t2i_ipadapter.py; the bodies here are
-byte-identical to the copies they replace.
-
 save_progress() and save_progress_env() differ only in which mapping they
 serialise - the identity variant writes name2placeholder/placeholder2name, the
 environment variant writes env2placeholder/placeholder2env. Those key names are
@@ -34,7 +29,6 @@ def extract_features(model, image_tensor):
     Args:
         model: osnet model
         image_tensor: torch.Tensor of shape [B, 3, H, W] or [3, H, W] in range [-1,1]
-        transform: optional torchvision transform to preprocess image_tensor
 
     Returns:
         features: torch.Tensor of shape [B, D]

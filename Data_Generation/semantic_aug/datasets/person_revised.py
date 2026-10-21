@@ -1,13 +1,9 @@
-# import sys
 import os
 import random
 import torch
-# sys.path.append('/data/zhicai/code/Diff-Mix/')
 from semantic_aug.few_shot_dataset import HugFewShotDataset
 from semantic_aug.datasets.utils import IMAGENET_TEMPLATES
-# from semantic_aug.generative_augmentation import GenerativeAugmentation
 from typing import Any, Tuple, Dict
-# from torch.utils.data import Dataset
 
 import numpy as np
 import pandas as pd
@@ -20,7 +16,6 @@ from collections import defaultdict
 from datasets import load_dataset, load_from_disk
 
 SUPER_CLASS_NAME = 'person'
-# HUG_LOCAL_IMAGE_TRAIN_DIR = "/root/autodl-tmp/process_sysu/person_sysu_market_ca_12_1011"
 HUG_LOCAL_IMAGE_TEST_DIR = "/root" #not used, doesn't matter
 
 HUG_LOCAL_IMAGE_TRAIN_DIR = os.getenv("HUG_LOCAL_IMAGE_TRAIN_DIR")
@@ -195,6 +190,18 @@ class PersonHugDataset(HugFewShotDataset):
         )
 
 class PersonHugDatasetForT2IStep1(torch.utils.data.Dataset):
+    """Training dataset for stage 1 (train_t2i_ila.py).
+
+    __getitem__ yields `pixel_values` and `caption` only.
+
+    The prompt's domain slot is the camera pseudo-word taken from the dataset's
+    `description` field, and identity placeholders come from whatever the
+    trainer assigns to `self.name2placeholder` - stage 1 is what learns them.
+    `class_prompts_ratio` defaults to 0.5,
+    so roughly half the samples use a raw description line as the prompt.
+
+    See PersonHugDatasetForT2I for the stage 2/3 variant.
+    """
 
     super_class_name = SUPER_CLASS_NAME
 
@@ -206,13 +213,11 @@ class PersonHugDatasetForT2IStep1(torch.utils.data.Dataset):
                  resolution: Tuple[int, int] = (512, 256),#int = 512,
                  center_crop: bool = False,
                  random_flip: bool = False,
-                 use_placeholder: bool = False,
                  examples_per_class: int = -1,
                  **kwargs):
 
         super().__init__()    
 
-        # dataset = load_dataset(image_train_dir, split='train')
         print(f"image_train_dir: {image_train_dir}")
         dataset = load_from_disk(image_train_dir)
 
@@ -243,7 +248,6 @@ class PersonHugDatasetForT2IStep1(torch.utils.data.Dataset):
         self.label2class = {v: k for k, v in self.class2label.items()} 
         self.num_classes = len(self.class_names)
         self.class_prompts_ratio = class_prompts_ratio
-        self.use_placeholder = use_placeholder        
         self.name2placeholder = None
         self.placeholder2name = None
         self.label_to_indices = defaultdict(list)
@@ -287,12 +291,9 @@ class PersonHugDatasetForT2IStep1(torch.utils.data.Dataset):
         return len(self.dataset)
 
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, int]:
-        # import pdb;pdb.set_trace()
         image = self.get_image_by_idx(idx)
         prompt = self.get_prompt_by_idx(idx)
         
-        # label = self.get_label_by_idx(idx)
-        # print(f"Label: {label}, prompt: {prompt}")
         return dict(pixel_values=self.transform(image), caption = prompt)
     
     def get_image_by_idx(self, idx: int) -> Image.Image:
@@ -306,7 +307,7 @@ class PersonHugDatasetForT2IStep1(torch.utils.data.Dataset):
     def get_prompt_by_idx(self, idx: int) -> str:
         """
         Return a string prompt for the given index,
-        using the updated IMAGENET_TEMPLATES_SMALL
+        using IMAGENET_TEMPLATES
         which has two placeholders: 
         - First for description 
         - Second for name
@@ -322,9 +323,8 @@ class PersonHugDatasetForT2IStep1(torch.utils.data.Dataset):
         domain_description = self.dataset[idx]['description'].strip()
         
         if flag:
-            # import pdb;pdb.set_trace()
             # (C) Optionally get the placeholder name vs. direct class label
-            if self.use_placeholder and self.name2placeholder is not None:
+            if self.name2placeholder is not None:
                 content = self.name2placeholder[self.label2class[self.dataset[idx]['label']]]
             else:
                 content = self.label2class[self.dataset[idx]['label']]
@@ -352,6 +352,23 @@ class PersonHugDatasetForT2IStep1(torch.utils.data.Dataset):
     
 
 class PersonHugDatasetForT2I(torch.utils.data.Dataset):
+    """Training dataset for stage 2 (train_t2i_envtoken.py) and stage 3
+    (train_t2i_ipadapter.py).
+
+    Differs from PersonHugDatasetForT2IStep1 in four ways:
+
+    - __getitem__ also yields `cond_pixel_values`, the cross-camera reference
+      crop chosen at random from the row's `cond_image` list. Both stages
+      collate it into the batch, but only stage 3 consumes it, as the OSNet
+      input for the IP-Adapter; in stage 2 it is carried and ignored.
+    - get_prompt_by_idx fills the prompt's domain slot with `<env_{N}_{i}>`
+      lighting tokens instead of the camera pseudo-word from `description`.
+    - get_prompt_by_idx reloads name2placeholder/placeholder2name from stage 1's
+      learned_embeds file on every call, overwriting whatever the trainer
+      assigned. That path hardcodes stage 1's step count, so it must be kept
+      in sync with STEP1_MAX_STEPS (see README section 5.4).
+    - `class_prompts_ratio` defaults to 1.0 rather than 0.5.
+    """
 
     super_class_name = SUPER_CLASS_NAME
 
@@ -364,13 +381,11 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
                  resolution: Tuple[int, int] = (512, 256), #int = 512,
                  center_crop: bool = False,
                  random_flip: bool = False,
-                 use_placeholder: bool = False,
                  examples_per_class: int = -1,
                  **kwargs):
 
         super().__init__()    
 
-        # dataset = load_dataset(image_train_dir, split='train')
         dataset = load_from_disk(image_train_dir)
 
         random.seed(seed)
@@ -401,7 +416,6 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
         self.num_classes = len(self.class_names)
         self.num_env_tokens_per_camera = num_env_tokens_per_camera
         self.class_prompts_ratio = class_prompts_ratio
-        self.use_placeholder = use_placeholder        
         self.name2placeholder = None
         self.placeholder2name = None
 
@@ -447,7 +461,6 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
         )  # [env1, env2, ..., env61]
         
         self.environment_names = []
-        # print("env_names: ", self.env_names)
         for env_name in self.env_names:
             cam = f'cam{(int(env_name[3:])-1) // self.num_env_tokens_per_camera + 1}'
             num_tokens = self.camera_num_tokens[cam]
@@ -464,13 +477,10 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
         return len(self.dataset)
 
     def __getitem__(self, idx: int) -> dict:
-        # import pdb;pdb.set_trace()
         image = self.get_image_by_idx(idx)
         prompt = self.get_prompt_by_idx(idx)
         cond_image = self.get_cond_image_by_idx(idx)
         
-        # label = self.get_label_by_idx(idx)
-        # print(f"Label: {label}, prompt: {prompt}")
 
         return dict(pixel_values=self.transform(image), cond_pixel_values=self.transform(cond_image), caption = prompt)
 
@@ -492,36 +502,28 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
     def get_prompt_by_idx(self, idx: int) -> str:
         """
         Return a string prompt for the given index,
-        using the updated IMAGENET_TEMPLATES_SMALL
+        using IMAGENET_TEMPLATES
         which has two placeholders: 
         - First for description 
         - Second for name
         """
 
         # (A) Decide if we build a prompt from label or from random lines in description
-        #     Right now, we always do the "class prompt" path if random.random() < self.class_prompts_ratio,
-        #     else we pick a random line from the description. 
-        #     (Change that ratio or logic as desired.)
+        #     class_prompts_ratio defaults to 1.0 here, so the class-prompt path is
+        #     effectively always taken. Both branches build the same env-token
+        #     domain string; the else branch just omits the identity and template.
         flag = random.random() < self.class_prompts_ratio
 
-        # (B) Access the textual description from the dataset
-        # domain_description = self.dataset[idx]['description'].strip()
-        # environment = self.dataset[idx]['environment'].strip()
-        
-        
         path = f"{HUG_LOCAL_IMAGE_TRAIN_DIR.rstrip('/')}/finetune_model/finetune_stage1_ila/learned_embeds-steps-100000.bin"
         self.name2placeholder = torch.load(path, map_location="cpu")["name2placeholder"]
         self.placeholder2name = torch.load(path, map_location="cpu")["placeholder2name"]
         if flag:
-            # import pdb;pdb.set_trace()
             # (C) Optionally get the placeholder name vs. direct class label
             content = self.name2placeholder[self.label2class[self.dataset[idx]['label']]]
 
-            # print(f'Person: {self.dataset[idx]["label"]}')
             # Append the "super_class_name" if you want, e.g. "person"
             content += " person"
             
-            # environment = self.env2placeholder[self.dataset[idx]['environment']]
             environment = self.dataset[idx]['environment']
             cam = f'cam{(int(environment[3:])-1) // self.num_env_tokens_per_camera + 1}'
             num_tokens = self.camera_num_tokens[cam]
@@ -539,7 +541,6 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
 
             prompt = template.format(domain_description, content)
             
-            # print(f'Using caption: {prompt}')
         else:
             environment = self.dataset[idx]['environment']
             cam = f'cam{(int(environment[3:])-1) // self.num_env_tokens_per_camera + 1}'
@@ -562,7 +563,7 @@ class PersonHugDatasetForT2I(torch.utils.data.Dataset):
     
 if __name__== '__main__':
     PLACEHOLDER_ENV_TEMPLATE = '<env_{}_{}>'
-    # HUG_LOCAL_IMAGE_TRAIN_DIR = '/path/to/train/data'
+    # HUG_LOCAL_IMAGE_TRAIN_DIR = '/path/to/train/data/'
     train_dataset = PersonHugDatasetForT2I(class_prompts_ratio=0.5)
     environment_names = train_dataset.environment_names
     placeholder_env_tokens = []

@@ -416,7 +416,6 @@ def main():
                                     center_crop = args.center_crop,
                                     resolution = (512, 256),#args.resolution,
                                     random_flip = args.random_flip,
-                                    use_placeholder = True,
                                     examples_per_class = args.examples_per_class
                                     )
     
@@ -428,7 +427,6 @@ def main():
 
     train_dataset.name2placeholder = name2placeholder
     train_dataset.placeholder2name = placeholder2name
-    # import pdb;pdb.set_trace()
     num_added_tokens = tokenizer.add_tokens(placeholder_tokens)
     if num_added_tokens != train_dataset.num_classes:
         raise ValueError(
@@ -570,7 +568,6 @@ def main():
     # We need to tokenize input captions and transform the images.
     def tokenize_captions(examples, is_train=True):
         captions = []
-        # import pdb;pdb.set_trace()
         for example in examples:
             caption = example['caption'] 
             if isinstance(caption, str):
@@ -589,11 +586,9 @@ def main():
 
 
     def collate_fn(examples):
-        # import pdb;pdb.set_trace()
         pixel_values = torch.stack([example["pixel_values"] for example in examples])
         pixel_values = pixel_values.to(memory_format=torch.contiguous_format).float()
         input_ids = tokenize_captions(examples) #'a jCmLmYM5 photo of a <class_599> person'
-        # input_ids = torch.stack([example["input_ids"] for example in input_ids])
         return {"pixel_values": pixel_values, "input_ids": input_ids}
 
     # DataLoaders creation:
@@ -684,7 +679,6 @@ def main():
 
     # keep original embeddings as reference
     orig_embeds_params = accelerator.unwrap_model(text_encoder).get_input_embeddings().weight.data.clone()
-    # import pdb;pdb.set_trace()
     for epoch in range(first_epoch, args.num_train_epochs):
         unet.train()
         text_encoder.train()
@@ -695,7 +689,6 @@ def main():
                 if step % args.gradient_accumulation_steps == 0:
                     progress_bar.update(1)
                 continue
-            # import pdb;pdb.set_trace()
             with accelerator.accumulate(unet, text_encoder):
                 # Convert images to latent space
                 latents = vae.encode(batch["pixel_values"].to(dtype=weight_dtype)).latent_dist.sample()
@@ -713,11 +706,9 @@ def main():
                 # Sample a random timestep for each image
                 timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (bsz,), device=latents.device)
                 timesteps = timesteps.long()
-                # import pdb;pdb.set_trace()
                 # Add noise to the latents according to the noise magnitude at each timestep
                 # (this is the forward diffusion process)
                 noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
-                # import pdb;pdb.set_trace()
                 # Get the text embedding for conditioning
                 encoder_hidden_states = text_encoder(batch["input_ids"])[0].to(dtype=weight_dtype) #[16, 77, 768] batch["input_ids"] [16, 77]
 
@@ -825,15 +816,9 @@ def main():
             if global_step >= args.max_train_steps:
                 break
 
-    # Both end-of-training saves were removed: `unet.save_attn_procs()` wrote
-    # pytorch_lora_weights.safetensors, byte-identical to the LoRA already in
-    # checkpoint-{max_train_steps}/model.safetensors, and learned_embeds-steps-last.bin
-    # duplicated learned_embeds-steps-{max_train_steps}.bin. Nothing reads either
-    # one: the next stage and generate_t2i.py load model.safetensors and
-    # learned_embeds-steps-{N}.bin from the checkpoint directory.
-    #
-    # NOTE: the final weights now come solely from the last periodic checkpoint,
-    # so keep max_train_steps an exact multiple of checkpointing_steps.
+    # There is no end-of-training save: the final weights come solely from the
+    # last periodic checkpoint, so keep max_train_steps an exact multiple of
+    # checkpointing_steps.
     accelerator.wait_for_everyone()
     accelerator.end_training()
     print("All processes finished.")

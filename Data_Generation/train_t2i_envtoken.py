@@ -380,7 +380,7 @@ def main():
     if args.seed is not None:
         set_seed(args.seed)
 
-    # Handle the repository creation
+    # Handle the repository creation extract_features
     if accelerator.is_main_process:
         if args.output_dir is not None:
             os.makedirs(args.output_dir, exist_ok=True)
@@ -426,7 +426,6 @@ def main():
                                     center_crop = args.center_crop,
                                     resolution = (512, 256),#args.resolution,
                                     random_flip = args.random_flip,
-                                    use_placeholder = True,
                                     examples_per_class = args.examples_per_class
                                     )
     
@@ -465,7 +464,6 @@ def main():
     with torch.no_grad():
         for token, embed in learned_embeds.items():
             token_id = tokenizer.convert_tokens_to_ids(token)
-            # print(f"Loaded weight for token id {token_id}")
             token_embeds[token_id] = embed
     
     camera_to_description = train_dataset.camera_to_description
@@ -487,11 +485,9 @@ def main():
         placeholder_env_token = PLACEHOLDER_ENV_TEMPLATE.format(env, token_order)
         placeholder_env_tokens.append(placeholder_env_token)
         env2placeholder[environment_name] = placeholder_env_token
-    # print(f'placeholder_env_tokens: {placeholder_env_tokens}')
     placeholder2env = {placeholder: env for env, placeholder in env2placeholder.items()}
     train_dataset.env2placeholder = env2placeholder
     train_dataset.placeholder2env = placeholder2env
-    # import pdb;pdb.set_trace()
     num_added_tokens = tokenizer.add_tokens(placeholder_env_tokens)
     if num_added_tokens != train_dataset.num_envs:
         raise ValueError(
@@ -503,7 +499,6 @@ def main():
     # Initialise the newly added placeholder token with the embeddings of the initializer token
     text_encoder.resize_token_embeddings(len(tokenizer))
     token_embeds = text_encoder.get_input_embeddings().weight.data
-    # initializer_env_id = INITIALIZER_ENV_TOKEN #42171
     placeholder_env_ids = tokenizer.convert_tokens_to_ids(placeholder_env_tokens) 
     placeholder_env_ids2tokens = {placeholder_env_id:placeholder_env_token for placeholder_env_id, placeholder_env_token in zip(placeholder_env_ids, placeholder_env_tokens)}
     with torch.no_grad(): #placeholder_tokens ['<env_0>', ...'<env_299>', '<env_61>']
@@ -514,7 +509,6 @@ def main():
             token_order = int(env_token.strip('<>').split('_')[2])
             initial_id = cam_to_token_ids[cam][token_order-1]
             token_embeds[token_id] = token_embeds[initial_id].clone() 
-            # print(f"Load token id {token_id} for token {env_token}, initial with token id {initial_id}")
             
     index_no_updates = torch.ones((len(tokenizer),), dtype=torch.bool) 
     index_no_updates[placeholder_env_ids] = False  # update placeholder_env_ids
@@ -595,10 +589,6 @@ def main():
     
     lora_layers = AttnProcsLayers(unet.attn_processors)
     
-    # Verify
-    # for name, p in lora_layers.named_parameters():
-    #     if p.requires_grad:
-    #         print("REQUIRED GRAD LAYERS:", name)
 
 
     # Enable TF32 for faster training on Ampere GPUs,
@@ -634,7 +624,6 @@ def main():
 
     def tokenize_captions(examples, is_train=True):
         captions = []
-        # import pdb;pdb.set_trace()
         for example in examples:
             caption = example['caption'] 
             if isinstance(caption, str):
@@ -653,13 +642,11 @@ def main():
 
 
     def collate_fn(examples):
-        # import pdb;pdb.set_trace()
         pixel_values = torch.stack([example["pixel_values"] for example in examples])
         pixel_values = pixel_values.to(memory_format=torch.contiguous_format).float()
         cond_pixel_values = torch.stack([example["cond_pixel_values"] for example in examples])
         cond_pixel_values = cond_pixel_values.to(memory_format=torch.contiguous_format).float()
         input_ids = tokenize_captions(examples) #'a jCmLmYM5 photo of a <class_599> person'
-        # input_ids = torch.stack([example["input_ids"] for example in input_ids])
         return {"pixel_values": pixel_values, "cond_pixel_values": cond_pixel_values, "input_ids": input_ids}
 
     # DataLoaders creation:
@@ -761,7 +748,6 @@ def main():
                 if step % args.gradient_accumulation_steps == 0:
                     progress_bar.update(1)
                 continue
-            # import pdb;pdb.set_trace()
             with accelerator.accumulate(unet, text_encoder):
                 # Convert images to latent space
                 latents = vae.encode(batch["pixel_values"].to(dtype=weight_dtype)).latent_dist.sample()
@@ -779,11 +765,9 @@ def main():
                 # Sample a random timestep for each image
                 timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (bsz,), device=latents.device)
                 timesteps = timesteps.long()
-                # import pdb;pdb.set_trace()
                 # Add noise to the latents according to the noise magnitude at each timestep
                 # (this is the forward diffusion process)
                 noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
-                # import pdb;pdb.set_trace()
                 # Get the text embedding for conditioning
                 encoder_hidden_states = text_encoder(batch["input_ids"])[0].to(dtype=weight_dtype) #[16, 77, 768] batch["input_ids"] [16, 77]
 
@@ -890,15 +874,9 @@ def main():
             if global_step >= args.max_train_steps:
                 break
 
-    # Both end-of-training saves were removed: `unet.save_attn_procs()` wrote
-    # pytorch_lora_weights.safetensors, byte-identical to the LoRA already in
-    # checkpoint-{max_train_steps}/model.safetensors, and learned_embeds-steps-last.bin
-    # duplicated learned_embeds-steps-{max_train_steps}.bin. Nothing reads either
-    # one: the next stage and generate_t2i.py load model.safetensors and
-    # learned_embeds-steps-{N}.bin from the checkpoint directory.
-    #
-    # NOTE: the final weights now come solely from the last periodic checkpoint,
-    # so keep max_train_steps an exact multiple of checkpointing_steps.
+    # There is no end-of-training save: the final weights come solely from the
+    # last periodic checkpoint, so keep max_train_steps an exact multiple of
+    # checkpointing_steps.
     accelerator.wait_for_everyone()
     accelerator.end_training()
     print("All processes finished.")

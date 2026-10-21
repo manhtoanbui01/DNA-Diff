@@ -6,11 +6,11 @@ DNA-Diff fine-tunes Stable Diffusion v1.5 in three stages so that it can render 
 given identity, taken from a daytime reference image, under a specific night-time
 camera and a specific lighting condition:
 
-| Stage | Script | What it learns |
-| --- | --- | --- |
-| 1 | `Data_Generation/train_t2i_ila.py` | **ILA** (Identity- and Lighting-Aware) base stage: LoRA on the UNet plus a textual-inversion token per identity and per camera. |
-| 2 | `Data_Generation/train_t2i_envtoken.py` | **Environment tokens** — one learned token per lighting group per camera, initialised from the stage-1 weights. |
-| 3 | `Data_Generation/train_t2i_ipadapter.py` | **IP-Adapter** conditioning on OSNet identity features, so appearance is carried over from a reference image instead of only from a text token. |
+| Stage | Script                                   | What it learns                                                                                                                                  |
+| ----- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1     | `Data_Generation/train_t2i_ila.py`       | **ILA** (Identity- and Lighting-Aware) base stage: LoRA on the UNet plus a textual-inversion token per identity and per camera.                 |
+| 2     | `Data_Generation/train_t2i_envtoken.py`  | **Environment tokens** — one learned token per lighting group per camera, initialised from the stage-1 weights.                                 |
+| 3     | `Data_Generation/train_t2i_ipadapter.py` | **IP-Adapter** conditioning on OSNet identity features, so appearance is carried over from a reference image instead of only from a text token. |
 
 Inference (`Data_Generation/generate_t2i.py`) then takes daytime Market-1501
 crops as identity references and generates night-time images for every
@@ -56,13 +56,13 @@ Everything under `dataset/`, `Data_Generation/deep_person_reid/`,
 
 ## 2. Requirements
 
-* Linux x86_64
-* NVIDIA GPU(s) — training was done on **3 × 24 GB** GPUs with `batch_size=32`,
+- Linux x86_64
+- NVIDIA GPU(s) — training was done on **3 × 24 GB** GPUs with `batch_size=32`,
   LoRA `rank=128`, fp16
-* NVIDIA driver supporting CUDA 12.1 or newer (the CUDA runtime ships with the
+- NVIDIA driver supporting CUDA 12.1 or newer (the CUDA runtime ships with the
   PyTorch wheels; no system CUDA toolkit is required)
-* conda / mamba
-* ~80 GB free disk for the dataset, checkpoints and generated images
+- conda / mamba
+- ~80 GB free disk for the dataset, checkpoints and generated images
 
 ---
 
@@ -145,15 +145,17 @@ its path — it is passed as `model_path` to every script below.
 
 ### 4.1 Download the source datasets
 
-* **NightReID** — the night-time ReID training split (`bounding_box_train`),
+- **NightReID** — the night-time ReID training split (`bounding_box_train`),
   filenames of the form `0042R3_*.jpg` (`L1..L3`, `R1..R3` = 6 cameras).
-* **Market-1501** (`Market-1501-v15.09.15`) — used as the daytime reference
+  <https://github.com/msm8976/NightReID>
+- **Market-1501** (`Market-1501-v15.09.15`) — used as the daytime reference
   camera; the `gt_bbox` folder is the one that is read.
+  <https://zheng-lab-anu.github.io/Project/project_reid.html>
 
 ### 4.2 Split the night-time cameras into lighting groups
 
 `Preprocess/group_by_lighting.py` sorts each camera's crops by mean HSV
-*value* and splits them into `NUM_GROUPS` (default **10**) equally sized
+_value_ and splits them into `NUM_GROUPS` (default **10**) equally sized
 environment groups.
 
 This script is configured by **constants at the top of the file**, not by CLI
@@ -251,14 +253,14 @@ Positional arguments: `data_dir  model_path  steps  batchsize  nepoch  rank  gpu
 
 Useful environment variables:
 
-| Variable | Default | Meaning |
-| --- | --- | --- |
-| `STEPS` | `"1 2 3"` | which stages to run, e.g. `"2 3"` |
-| `GPU_IDS` | `1,2,3` | physical GPU ids passed to `accelerate --gpu_ids` |
-| `LOG_DIR` | `<data_dir>/finetune_model/logs` | per-stage logs |
-| `STEP1_MAX_STEPS` / `STEP1_CKPT_STEPS` | `100000` / `25000` | stage-1 schedule |
-| `STEP2_MAX_STEPS` / `STEP2_CKPT_STEPS` | `40000` / `10000` | stage-2 schedule |
-| `STEP3_MAX_STEPS` / `STEP3_CKPT_STEPS` | `30000` / `10000` | stage-3 schedule |
+| Variable                               | Default                          | Meaning                                           |
+| -------------------------------------- | -------------------------------- | ------------------------------------------------- |
+| `STEPS`                                | `"1 2 3"`                        | which stages to run, e.g. `"2 3"`                 |
+| `GPU_IDS`                              | `1,2,3`                          | physical GPU ids passed to `accelerate --gpu_ids` |
+| `LOG_DIR`                              | `<data_dir>/finetune_model/logs` | per-stage logs                                    |
+| `STEP1_MAX_STEPS` / `STEP1_CKPT_STEPS` | `100000` / `25000`               | stage-1 schedule                                  |
+| `STEP2_MAX_STEPS` / `STEP2_CKPT_STEPS` | `40000` / `10000`                | stage-2 schedule                                  |
+| `STEP3_MAX_STEPS` / `STEP3_CKPT_STEPS` | `30000` / `10000`                | stage-3 schedule                                  |
 
 Do **not** also set `CUDA_VISIBLE_DEVICES` — `GPU_IDS` is already physical
 indices and setting both remaps them twice.
@@ -299,12 +301,12 @@ dataset/NightReID_Market1501/finetune_model/
 Each stage loads the previous stage's weights from paths that embed the
 previous stage's **step count**:
 
-| File | Line | Expects |
-| --- | --- | --- |
-| `train_t2i_envtoken.py` | 507, 593 | `finetune_stage1_ila/learned_embeds-steps-100000.bin`, `finetune_stage1_ila/checkpoint-100000/model.safetensors` |
-| `train_t2i_ipadapter.py` | 546, 602, 646 | `finetune_stage1_ila/learned_embeds-steps-100000.bin`, `finetune_stage2_envtoken/learned_embeds-steps-40000.bin`, `finetune_stage2_envtoken/checkpoint-40000/model.safetensors` |
-| `generate_t2i.py` | 89, 91 | `finetune_stage3_ipadapter/checkpoint-30000`, `finetune_stage1_ila/learned_embeds-steps-100000.bin` |
-| `semantic_aug/datasets/person_revised.py` | 512 | `finetune_stage1_ila/learned_embeds-steps-100000.bin` |
+| File                                      | Line          | Expects                                                                                                                                                                         |
+| ----------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `train_t2i_envtoken.py`                   | 507, 593      | `finetune_stage1_ila/learned_embeds-steps-100000.bin`, `finetune_stage1_ila/checkpoint-100000/model.safetensors`                                                                |
+| `train_t2i_ipadapter.py`                  | 546, 602, 646 | `finetune_stage1_ila/learned_embeds-steps-100000.bin`, `finetune_stage2_envtoken/learned_embeds-steps-40000.bin`, `finetune_stage2_envtoken/checkpoint-40000/model.safetensors` |
+| `generate_t2i.py`                         | 89, 91        | `finetune_stage3_ipadapter/checkpoint-30000`, `finetune_stage1_ila/learned_embeds-steps-100000.bin`                                                                             |
+| `semantic_aug/datasets/person_revised.py` | 512           | `finetune_stage1_ila/learned_embeds-steps-100000.bin`                                                                                                                           |
 
 If you change `STEP*_MAX_STEPS`, update these paths too. `finetune_all.sh`
 prints a warning when the schedules and the hard-coded paths diverge, but it
@@ -334,17 +336,17 @@ Key `generate_t2i.py` flags. These are no longer hardcoded — each is
 `sample` argument 8-13, or the environment variable in brackets
 (`DEBUG=1` for single-process):
 
-| Flag | Default in `sample.sh` | Meaning |
-| --- | --- | --- |
-| `--cameras` (`CAMERAS`) | `cam1 … cam6` | target night-time cameras |
-| `--gpu_ids` (`GPU_IDS`) | `1 2 3` | one worker process per GPU |
-| `--batch_size` (`BATCH_SIZE`) | `60` | queue items pulled per pipeline call |
-| `--repeat_each_id` (`REPEAT_EACH_ID`) | `3` | how many times each identity is enqueued per camera |
-| `--images_per_call` (`IMAGES_PER_CALL`) | `1` | images generated per pipeline call |
-| `--guidance_scale` (`GUIDANCE_SCALE`) | `7.5` | classifier-free guidance strength |
-| `--threshold` | `500` | identities with numeric id ≤ this are ignored |
-| `--resolution` | `512` | output size |
-| `--debug` (`DEBUG`) | off | single-process mode, easier to trace |
+| Flag                                    | Default in `sample.sh` | Meaning                                             |
+| --------------------------------------- | ---------------------- | --------------------------------------------------- |
+| `--cameras` (`CAMERAS`)                 | `cam1 … cam6`          | target night-time cameras                           |
+| `--gpu_ids` (`GPU_IDS`)                 | `1 2 3`                | one worker process per GPU                          |
+| `--batch_size` (`BATCH_SIZE`)           | `60`                   | queue items pulled per pipeline call                |
+| `--repeat_each_id` (`REPEAT_EACH_ID`)   | `3`                    | how many times each identity is enqueued per camera |
+| `--images_per_call` (`IMAGES_PER_CALL`) | `1`                    | images generated per pipeline call                  |
+| `--guidance_scale` (`GUIDANCE_SCALE`)   | `7.5`                  | classifier-free guidance strength                   |
+| `--threshold`                           | `500`                  | identities with numeric id ≤ this are ignored       |
+| `--resolution`                          | `512`                  | output size                                         |
+| `--debug` (`DEBUG`)                     | off                    | single-process mode, easier to trace                |
 
 `--threshold` is the one flag `sample.sh` does not expose; it falls back to the
 argparse default. The LoRA checkpoint and learned embeddings are resolved from
@@ -380,12 +382,12 @@ used to train any downstream ReID model.
 Besides the hard-coded checkpoint paths in §5.4, the following absolute paths
 are baked into the source and must be edited:
 
-| File | Line | Path |
-| --- | --- | --- |
-| `Data_Generation/semantic_aug/augmentations/dreabooth_lora_mt.py` | 2, 24 | `sys.path.append(...)` |
-| `Preprocess/group_by_lighting.py` | 22–23 | `INPUT_PATH`, `OUTPUT_PATH` |
-| `Preprocess/market2nightreid.py` | 15, 21 | argparse defaults (overridable on the CLI) |
-| `Data_Generation/scripts/*.sh` | — | `data_dir`, `model_path` defaults (overridable as arguments) |
+| File                                                              | Line   | Path                                                         |
+| ----------------------------------------------------------------- | ------ | ------------------------------------------------------------ |
+| `Data_Generation/semantic_aug/augmentations/dreabooth_lora_mt.py` | 2, 24  | `sys.path.append(...)`                                       |
+| `Preprocess/group_by_lighting.py`                                 | 22–23  | `INPUT_PATH`, `OUTPUT_PATH`                                  |
+| `Preprocess/market2nightreid.py`                                  | 15, 21 | argparse defaults (overridable on the CLI)                   |
+| `Data_Generation/scripts/*.sh`                                    | —      | `data_dir`, `model_path` defaults (overridable as arguments) |
 
 ---
 

@@ -55,7 +55,6 @@ def load_diffmix_embeddings(embed_path: str,
         assert num_added_tokens > 0, ERROR_MESSAGE.format(token=token)
         
         # if token == "<class_7>":
-        #     print(f'Token: {token}, embedding: {token_embedding}')
         
         # resize the token embeddings
         text_encoder.resize_token_embeddings(len(tokenizer))
@@ -67,7 +66,6 @@ def load_diffmix_embeddings(embed_path: str,
         # get the id for the token and assign new embeds
         embeddings.weight.data[added_token_id] = \
             token_embedding.to(embeddings.weight.dtype)
-        # print("Embedding weight dtype: ", embeddings.weight.dtype)
 
     return name2placeholder, placeholder2name
 
@@ -139,8 +137,6 @@ class DreamboothLoraGeneration(GenerativeMixup):
             scheduler = DPMSolverMultistepScheduler.from_config(DreamboothLoraGeneration.pipe.scheduler.config, local_files_only=True)
             self.placeholder2name = None
             self.name2placeholder = None
-            # embed_path = os.path.join(os.path.dirname(os.path.normpath(checkpoint_path)), f'learned_embeds-steps-last.bin')
-            # embed_path = "/data4/toan/projects/DiVE/dataset/NightReID_DukeMTMC_ori_stage1_envtoken_stage2_ipadapter_stage3_intensity_full_id/finetune_model/finetune_stage1_ila/learned_embeds-steps-last.bin"
             self.name2placeholder, self.placeholder2name = load_diffmix_embeddings(embed_path, DreamboothLoraGeneration.pipe.text_encoder, DreamboothLoraGeneration.pipe.tokenizer)
             data_dir = os.environ.get("HUG_LOCAL_IMAGE_TRAIN_DIR")
             embed_path_env = env_embed_path or os.path.join(data_dir, 'finetune_model', 'finetune_stage2_envtoken', 'learned_embeds-steps-40000.bin')
@@ -150,8 +146,6 @@ class DreamboothLoraGeneration(GenerativeMixup):
             # token_id = DreamboothLoraGeneration.pipe.tokenizer.convert_tokens_to_ids("<env_7>")
             # embedding = embedding_layer.weight[token_id]
 
-            # print("Token ID:", token_id)
-            # print("Embedding shape:", embedding)
             
             unet = DreamboothLoraGeneration.pipe.unet
             lora_ipadapter_attn_procs = {}

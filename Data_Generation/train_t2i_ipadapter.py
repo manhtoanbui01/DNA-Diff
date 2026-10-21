@@ -454,7 +454,6 @@ def main():
                                     center_crop = args.center_crop,
                                     resolution = (512, 256),#args.resolution,
                                     random_flip = args.random_flip,
-                                    use_placeholder = True,
                                     examples_per_class = args.examples_per_class
                                     )
     
@@ -492,7 +491,6 @@ def main():
     with torch.no_grad():
         for token, embed in learned_embeds.items():
             token_id = tokenizer.convert_tokens_to_ids(token)
-            # print(f"Loaded weight for token id {token_id}")
             token_embeds[token_id] = embed
     
     camera_to_description = train_dataset.camera_to_description
@@ -514,11 +512,9 @@ def main():
         placeholder_env_token = PLACEHOLDER_ENV_TEMPLATE.format(env, token_order)
         placeholder_env_tokens.append(placeholder_env_token)
         env2placeholder[environment_name] = placeholder_env_token
-    # print(f'placeholder_env_tokens: {placeholder_env_tokens}')
     placeholder2env = {placeholder: env for env, placeholder in env2placeholder.items()}
     train_dataset.env2placeholder = env2placeholder
     train_dataset.placeholder2env = placeholder2env
-    # import pdb;pdb.set_trace()
     num_added_tokens = tokenizer.add_tokens(placeholder_env_tokens)
     if num_added_tokens != train_dataset.num_envs:
         raise ValueError(
@@ -540,7 +536,6 @@ def main():
             token_order = int(env_token.strip('<>').split('_')[2])
             initial_id = cam_to_token_ids[cam][token_order-1]
             token_embeds[token_id] = token_embeds[initial_id].clone() 
-            # print(f"Load token id {token_id} for token {env_token}, initial with token id {initial_id}")
 
     text_encoder_weight_path_env = os.path.join(data_dir, "finetune_model", "finetune_stage2_envtoken", "learned_embeds-steps-40000.bin")
     learned_embeds_env = torch.load(text_encoder_weight_path_env, map_location="cpu")["learned_embeds_dict"]
@@ -548,7 +543,6 @@ def main():
     with torch.no_grad():
         for token, embed in learned_embeds_env.items():
             token_id = tokenizer.convert_tokens_to_ids(token)
-            # print(f"Load token {token} has id {token_id}")
             token_embeds[token_id] = embed
 
     # 5. Freeze entire text encoder
@@ -643,10 +637,6 @@ def main():
     
     lora_layers = AttnProcsLayers(unet.attn_processors)
     
-    # Verify
-    # for name, p in lora_layers.named_parameters():
-    #     if p.requires_grad:
-    #         print("REQUIRED GRAD LAYERS:", name)
 
 
     # Enable TF32 for faster training on Ampere GPUs,
@@ -682,7 +672,6 @@ def main():
 
     def tokenize_captions(examples, is_train=True):
         captions = []
-        # import pdb;pdb.set_trace()
         for example in examples:
             caption = example['caption'] 
             if isinstance(caption, str):
@@ -701,7 +690,6 @@ def main():
 
 
     def collate_fn(examples):
-        # import pdb;pdb.set_trace()
         pixel_values = torch.stack([example["pixel_values"] for example in examples])
         pixel_values = pixel_values.to(memory_format=torch.contiguous_format).float()
         cond_pixel_values = torch.stack([example["cond_pixel_values"] for example in examples])
@@ -797,8 +785,6 @@ def main():
 #endregion
 
     # keep original embeddings as reference
-    # orig_embeds_params = accelerator.unwrap_model(text_encoder).get_input_embeddings().weight.data.clone()
-    # import pdb;pdb.set_trace()
     for epoch in range(first_epoch, args.num_train_epochs):
         unet.train()
         # text_encoder.train()
@@ -809,7 +795,6 @@ def main():
                 if step % args.gradient_accumulation_steps == 0:
                     progress_bar.update(1)
                 continue
-            # import pdb;pdb.set_trace()
             with accelerator.accumulate(unet, image_proj_model):
                 # Convert images to latent space
                 latents = vae.encode(batch["pixel_values"].to(dtype=weight_dtype)).latent_dist.sample()
@@ -827,11 +812,9 @@ def main():
                 # Sample a random timestep for each image
                 timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (bsz,), device=latents.device)
                 timesteps = timesteps.long()
-                # import pdb;pdb.set_trace()
                 # Add noise to the latents according to the noise magnitude at each timestep
                 # (this is the forward diffusion process)
                 noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
-                # import pdb;pdb.set_trace()
                 # Get the text embedding for conditioning
                 encoder_hidden_states = text_encoder(batch["input_ids"])[0].to(dtype=weight_dtype) #[16, 77, 768] batch["input_ids"] [16, 77]
                 osnet_embeds = extract_features(osnet, batch["cond_pixel_values"])
