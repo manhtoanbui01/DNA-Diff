@@ -836,24 +836,16 @@ def main():
             if global_step >= args.max_train_steps:
                 break
 
-    # Save the lora layers
+    # Both end-of-training saves were removed: `unet.save_attn_procs()` wrote
+    # pytorch_lora_weights.safetensors, byte-identical to the LoRA already in
+    # checkpoint-{max_train_steps}/model.safetensors, and learned_embeds-steps-last.bin
+    # duplicated learned_embeds-steps-{max_train_steps}.bin. Nothing reads either
+    # one: the next stage and generate_t2i.py load model.safetensors and
+    # learned_embeds-steps-{N}.bin from the checkpoint directory.
+    #
+    # NOTE: the final weights now come solely from the last periodic checkpoint,
+    # so keep max_train_steps an exact multiple of checkpointing_steps.
     accelerator.wait_for_everyone()
-    if accelerator.is_main_process:
-        unet = unet.to(torch.float32)
-        unet.save_attn_procs(args.output_dir)
-        weight_name = (
-            f"learned_embeds-steps-last.bin"
-        )
-        save_progress(
-            text_encoder,
-            placeholder_token_ids,
-            accelerator,
-            args,
-            name2placeholder=name2placeholder,
-            placeholder2name=placeholder2name,
-            save_path = os.path.join(args.output_dir, weight_name),
-        )
-
     accelerator.end_training()
     print("All processes finished.")
 

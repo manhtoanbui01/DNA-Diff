@@ -543,7 +543,7 @@ def main():
 
 
     data_dir = os.environ.get("HUG_LOCAL_IMAGE_TRAIN_DIR")
-    text_encoder_weight_path = os.path.join(data_dir,"finetune_model","finetune_stage1_dive", "learned_embeds-steps-100000.bin")
+    text_encoder_weight_path = os.path.join(data_dir,"finetune_model","finetune_stage1_ila", "learned_embeds-steps-100000.bin")
     learned_embeds = torch.load(text_encoder_weight_path, map_location="cpu")["learned_embeds_dict"]
 
     with torch.no_grad():

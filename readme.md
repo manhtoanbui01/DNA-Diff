@@ -8,13 +8,17 @@ camera and a specific lighting condition:
 
 | Stage | Script | What it learns |
 | --- | --- | --- |
-| 1 | `Data_Generation/train_t2i_dive.py` | LoRA on the UNet + a textual-inversion token per identity and per camera (DiVE-style baseline). |
+| 1 | `Data_Generation/train_t2i_ila.py` | **ILA** (Identity- and Lighting-Aware) base stage: LoRA on the UNet plus a textual-inversion token per identity and per camera. |
 | 2 | `Data_Generation/train_t2i_envtoken.py` | **Environment tokens** — one learned token per lighting group per camera, initialised from the stage-1 weights. |
 | 3 | `Data_Generation/train_t2i_ipadapter.py` | **IP-Adapter** conditioning on OSNet identity features, so appearance is carried over from a reference image instead of only from a text token. |
 
 Inference (`Data_Generation/generate_t2i.py`) then takes daytime Market-1501
 crops as identity references and generates night-time images for every
 camera / environment combination.
+
+Each stage is named after what it adds, and the checkpoint directory it writes
+follows the same convention: `finetune_stage1_ila/`, `finetune_stage2_envtoken/`,
+`finetune_stage3_ipadapter/`.
 
 ---
 
@@ -29,7 +33,7 @@ DNA-Diff/
 │   ├── market2nightreid.py         # append Market-1501 as the daytime camera
 │   └── c2hf.py                     # convert the folder tree to a HF arrow dataset
 ├── Data_Generation/
-│   ├── train_t2i_dive.py           # stage 1
+│   ├── train_t2i_ila.py           # stage 1
 │   ├── train_t2i_envtoken.py       # stage 2
 │   ├── train_t2i_ipadapter.py      # stage 3
 │   ├── lora_ipadapter.py           # IP-Adapter attention processors / projection
@@ -290,7 +294,7 @@ The same applies to `finetune_step2.sh` and `finetune_step3.sh`.
 
 ```
 dataset/NightReID_Market1501/finetune_model/
-├── finetune_stage1_dive/
+├── finetune_stage1_ila/
 │   ├── checkpoint-100000/model.safetensors
 │   └── learned_embeds-steps-100000.bin
 ├── finetune_stage2_envtoken/
@@ -307,10 +311,10 @@ previous stage's **step count**:
 
 | File | Line | Expects |
 | --- | --- | --- |
-| `train_t2i_envtoken.py` | 507, 593 | `finetune_stage1_dive/learned_embeds-steps-100000.bin`, `finetune_stage1_dive/checkpoint-100000/model.safetensors` |
-| `train_t2i_ipadapter.py` | 537, 593, 637 | `finetune_stage1_dive/learned_embeds-steps-100000.bin`, `finetune_stage2_envtoken/learned_embeds-steps-40000.bin`, `finetune_stage2_envtoken/checkpoint-40000/model.safetensors` |
-| `generate_t2i.py` | 81, 83 | `finetune_stage3_ipadapter/checkpoint-30000`, `finetune_stage1_dive/learned_embeds-steps-100000.bin` |
-| `semantic_aug/datasets/person_revised.py` | 512 | `finetune_stage1_dive/learned_embeds-steps-100000.bin` |
+| `train_t2i_envtoken.py` | 507, 593 | `finetune_stage1_ila/learned_embeds-steps-100000.bin`, `finetune_stage1_ila/checkpoint-100000/model.safetensors` |
+| `train_t2i_ipadapter.py` | 546, 602, 646 | `finetune_stage1_ila/learned_embeds-steps-100000.bin`, `finetune_stage2_envtoken/learned_embeds-steps-40000.bin`, `finetune_stage2_envtoken/checkpoint-40000/model.safetensors` |
+| `generate_t2i.py` | 89, 91 | `finetune_stage3_ipadapter/checkpoint-30000`, `finetune_stage1_ila/learned_embeds-steps-100000.bin` |
+| `semantic_aug/datasets/person_revised.py` | 512 | `finetune_stage1_ila/learned_embeds-steps-100000.bin` |
 
 If you change `STEP*_MAX_STEPS`, update these paths too. `finetune_all.sh`
 prints a warning when the schedules and the hard-coded paths diverge, but it

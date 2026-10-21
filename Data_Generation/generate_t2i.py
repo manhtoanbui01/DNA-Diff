@@ -88,7 +88,7 @@ def generate_translations(args, in_queue, out_queue, gpu_id):
     model = DreamboothLoraGeneration(
         checkpoint_path = os.path.join(data_dir, "finetune_model", "finetune_stage3_ipadapter", "checkpoint-30000"),
         model_path=args.model_path,
-        embed_path=os.path.join(data_dir, "finetune_model", "finetune_stage1_dive", "learned_embeds-steps-100000.bin"),
+        embed_path=os.path.join(data_dir, "finetune_model", "finetune_stage1_ila", "learned_embeds-steps-100000.bin"),
         prompt=args.prompt,
         guidance_scale=args.guidance_scale,
         mask=args.mask,
@@ -375,8 +375,6 @@ if __name__ == "__main__":
     parser.add_argument("--threshold", type=int, default=500, help="Ignore classes with numeric ID <= this threshold.")
     parser.add_argument("--images_per_call", type=int, default=1, help="Number of images generated per pipeline call.")
     parser.add_argument("--model_path", type=str, default="CompVis/stable-diffusion-v1-4", help="Base model path.")
-    parser.add_argument("--lora_path", type=str, default='finetune_model/lora_ti/pytorch_lora_weights.safetensors', help="path to lora")
-    parser.add_argument("--embed_path", type=str, default='finetune_model/lora_ti/learned_embeds-steps-last.bin', help="path to textual embedding")
     parser.add_argument("--guidance_scale",type=float,default=7.5,help="Guidance scale for classifier-free guidance (how strictly to follow the text prompt, higher = more strict)",)
     parser.add_argument("--use_pretrained_weights", type=lambda x: x.lower() == "true", default=False, help="Whether to use pretrained weights")
     args = parser.parse_args()

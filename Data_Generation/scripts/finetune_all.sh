@@ -1,14 +1,14 @@
 #!/bin/bash
 # finetune_all.sh - Run the full 3-stage finetuning pipeline sequentially
 #
-#   Step 1: train_t2i_dive.py       -> finetune_model/finetune_stage1_dive/
+#   Step 1: train_t2i_ila.py       -> finetune_model/finetune_stage1_ila/
 #   Step 2: train_t2i_envtoken.py   -> finetune_model/finetune_stage2_envtoken/
 #   Step 3: train_t2i_ipadapter.py  -> finetune_model/finetune_stage3_ipadapter/
 #
 # Each stage loads the previous stage's weights. Those paths are HARDCODED inside
 # the training scripts and are keyed to the stage's max_train_steps:
-#   train_t2i_envtoken.py  reads  finetune_stage1_dive/checkpoint-100000/model.safetensors
-#                          and    finetune_stage1_dive/learned_embeds-steps-100000.bin
+#   train_t2i_envtoken.py  reads  finetune_stage1_ila/checkpoint-100000/model.safetensors
+#                          and    finetune_stage1_ila/learned_embeds-steps-100000.bin
 #   train_t2i_ipadapter.py reads  finetune_stage2_envtoken/checkpoint-40000/model.safetensors
 #                          and    finetune_stage2_envtoken/learned_embeds-steps-40000.bin
 # So if you change STEP1_MAX_STEPS / STEP2_MAX_STEPS you must also update those
@@ -42,7 +42,7 @@ function finetune_all {
     step3_ckpt_steps=${STEP3_CKPT_STEPS:-10000}
 
     model_root="${data_dir%/}/finetune_model"
-    stage1_out="$model_root/finetune_stage1_dive/"
+    stage1_out="$model_root/finetune_stage1_ila/"
     stage2_out="$model_root/finetune_stage2_envtoken/"
     stage3_out="$model_root/finetune_stage3_ipadapter/"
 
