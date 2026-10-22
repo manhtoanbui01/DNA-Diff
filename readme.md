@@ -29,7 +29,7 @@ given identity, taken from a daytime reference image, under a specific night-tim
 camera and a specific lighting condition:
 
 <p align="center">
-  <img src="figures/pipeline.png" width="85%">
+  <img src="figures/pipeline.png" width="85%"><br>
   <em>Overview of the DNA-Diff architecture.</em>
 </p>
 
