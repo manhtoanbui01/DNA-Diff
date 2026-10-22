@@ -498,24 +498,14 @@ sample \
 ```
 cd Data_Generation
 source scripts/sample.sh
-sample  <dataset_root>  <daytime_crops>  <sd_model>  <output_dir>
+sample \
+    /abs/path/to/dataset/NightReID_Market1501/ \
+    /abs/path/to/dataset/NightReID_Market1501/cam7/env61/ \
+    /abs/path/to/stable-diffusion-v1-5 \
+    /abs/path/to/output_dir \
 ```
 
-| #   | Argument         | Example                                   |
-| --- | ---------------- | ----------------------------------------- |
-| 1   | dataset root     | `dataset/NightReID_Market1501/`           |
-| 2   | daytime crops    | `dataset/NightReID_Market1501/cam7/env61/`|
-| 3   | base SD-1.5      | `stable-diffusion-v1-5`                   |
-| 4   | output directory | `outputs/`                                |
-
-Images land at `<output_dir>/<camN>/<id:04d>/<env_id>_<n>.jpg`. Every
-`<env_N_i>` token is sampled in turn, so one identity comes back across the
-full range of lighting conditions:
-
-<p align="center">
-  <img src="figures/illumination_diversity.png" width="85%"
-       alt="One identity generated across many lighting conditions">
-</p>
+Images land at `<output_dir>/<camN>/<id:04d>/<env_id>_<n>.jpg`.
 
 > [!TIP]
 >
