@@ -6,7 +6,7 @@ function sample {
     data_dir=${1:-"../dataset/NightReID_Market1501/"}
     cond_daytime_path=${2:-"${data_dir%/}/cam7/env61/"}
     model_path=${3:-"../stable-diffusion-v1-5"}
-    output_dir=${4:-"${data_dir%/}/finetune_model/finetune_stage3_ipadapter/output_step30000_test"}
+    output_dir=${4:-"${data_dir%/}/finetune_model/finetune_stage3_ipadapter/output"}
     num_env_tokens_per_camera=${5:-10}
     resolution=${6:-512}
     use_pretrained_weights=${7:-false}

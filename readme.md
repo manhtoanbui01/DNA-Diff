@@ -1,10 +1,36 @@
+<div align="center">
+
 # DNA-Diff
 
-Diffusion-based synthetic data generation for **night-time person re-identification**.
+### Lighting-Aware Diffusion-based Data Augmentation for<br>Robust Low-Light Re-Identification
+
+**BMVC 2026** · Official implementation
+
+[![Paper](https://img.shields.io/badge/Paper-TBA-b31b1b?style=flat-square)](TBA)
+[![Weights](https://img.shields.io/badge/Weights-Hugging%20Face-FFD21E?style=flat-square&logo=huggingface&logoColor=black)](https://huggingface.co/manhtoanbui01/DNA-Diff)
+[![Python](https://img.shields.io/badge/Python-3.10-3776AB?style=flat-square&logo=python&logoColor=white)](environment.yml)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.1.2%2Bcu121-EE4C2C?style=flat-square&logo=pytorch&logoColor=white)](environment.yml)
+[![Diffusers](https://img.shields.io/badge/Diffusers-0.23.1-6f42c1?style=flat-square)](environment.yml)
+
+</div>
+
+DNA-Diff (**D**ay-to-**N**ight **A**daptation via **Diff**usion) turns labelled
+daytime ReID data into realistic nighttime training images. It uses
+environment tokens for lighting diversity and an IP-Adapter for identity
+preservation, and it needs no paired day/night data.
+
+<p align="center">
+  <img src="figures/qualitative_comparison.png" width="85%"><br>
+  <em>Market-1501 identities rendered under NightReID lighting.</em>
+</p>
 
 DNA-Diff fine-tunes Stable Diffusion v1.5 in three stages so that it can render a
 given identity, taken from a daytime reference image, under a specific night-time
 camera and a specific lighting condition:
+
+<p align="center">
+  <img src="figures/pipeline.png" width="85%">
+</p>
 
 | Stage | Script                                   | What it learns                                                                                                                                  |
 | ----- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -18,7 +44,28 @@ camera / environment combination.
 
 Each stage is named after what it adds, and the checkpoint directory it writes
 follows the same convention: `finetune_stage1_ila/`, `finetune_stage2_envtoken/`,
-`finetune_stage3_ipadapter/`.
+`finetune_stage3_ipadapter/`
+
+---
+
+## Contents
+
+<div align="center">
+  <a href="#1-repository-layout"><b>1 · Repository layout</b></a> &nbsp;·&nbsp;
+  <a href="#2-requirements"><b>2 · Requirements</b></a> &nbsp;·&nbsp;
+  <a href="#3-installation"><b>3 · Installation</b></a> &nbsp;·&nbsp;
+  <a href="#4-data-preparation"><b>4 · Data preparation</b></a> &nbsp;·&nbsp;
+  <a href="#5-training"><b>5 · Training</b></a>
+  <br>
+  <a href="#6-generation"><b>6 · Generation</b></a> &nbsp;·&nbsp;
+  <a href="#7-exporting-synthetic-data-for-reid-training"><b>7 · Export for ReID</b></a> &nbsp;·&nbsp;
+  <a href="#8-paths-to-change-when-porting-to-a-new-machine"><b>8 · Porting</b></a> &nbsp;·&nbsp;
+  <a href="#9-troubleshooting"><b>9 · Troubleshooting</b></a>
+  <br><br>
+  <sub><b>In a hurry?</b> Skip training —
+  <a href="#55-using-published-pretrained-weights-skip-training">§5.5</a>
+  runs generation straight from the released weights.</sub>
+</div>
 
 ---
 
@@ -27,12 +74,13 @@ follows the same convention: `finetune_stage1_ila/`, `finetune_stage2_envtoken/`
 ```
 DNA-Diff/
 ├── environment.yml                 # conda environment (primary install path)
+├── figures/                        # figures used by this README
 ├── Preprocess/
 │   ├── group_by_lighting.py        # split NightReID by brightness into env groups
 │   ├── market2nightreid.py         # append Market-1501 as the daytime camera
 │   └── c2hf.py                     # convert the folder tree to a HF arrow dataset
 ├── Data_Generation/
-│   ├── train_t2i_ila.py           # stage 1
+│   ├── train_t2i_ila.py            # stage 1
 │   ├── train_t2i_envtoken.py       # stage 2
 │   ├── train_t2i_ipadapter.py      # stage 3
 │   ├── train_common.py             # helpers shared by the three stages
@@ -70,37 +118,39 @@ Everything under `dataset/`, `Data_Generation/deep_person_reid/`,
 
 ### 3.1 Clone the repository
 
-```bash
+```
 git clone https://github.com/manhtoanbui01/DNA-Diff.git DNA-Diff
 cd DNA-Diff
 ```
 
 ### 3.2 Create the environment
 
-```bash
+```
 conda env create -f environment.yml
 conda activate dna-diff
 ```
 
+> [!IMPORTANT]
+>
 > `diffusers` is pinned to **0.23.1**. The training scripts subclass the LoRA
 > attention processors from that release; later versions relocate them and the
 > import will fail.
 
 <!-- Configure `accelerate` once (choose multi-GPU, fp16):
 
-```bash
+```
 accelerate config
 ``` -->
 
 ### 3.3 Download Stable Diffusion v1.5
 
-```bash
+```
 pip install huggingface_hub
 ```
 
 Log in to Hugging Face:
 
-```bash
+```
 huggingface-cli login
 ```
 
@@ -109,10 +159,12 @@ token, and use it when prompted by `huggingface-cli login`.
 
 Download the model:
 
-```bash
+```
 huggingface-cli download stable-diffusion-v1-5/stable-diffusion-v1-5 --local-dir ./stable-diffusion-v1-5
 ```
 
+> [!TIP]
+>
 > **Attention:** add `--local-dir-use-symlinks False` to download directly to
 > the given path.
 
@@ -121,7 +173,7 @@ its path — it is passed as `model_path` to every script below.
 
 Change directory to:
 
-```bash
+```
 cd Data_Generation
 ```
 
@@ -134,6 +186,8 @@ locally modified** copy of
 [`deep-person-reid`](https://github.com/KaiyangZhou/deep-person-reid) that lives
 at `Data_Generation/deep_person_reid/`.
 
+> [!WARNING]
+>
 > **Do not replace it with a fresh upstream clone.** Some of its modules have
 > been rewritten to import through the `deep_person_reid.` prefix
 > (`torchreid/utils/feature_extractor.py`), while the rest still use bare
@@ -147,7 +201,7 @@ underscores** — the code does `from deep_person_reid.torchreid.utils import ..
 and a plain `git clone` would create `deep-person-reid`, which is not a valid
 Python package name:
 
-```bash
+```
 git clone https://github.com/KaiyangZhou/deep-person-reid.git deep_person_reid
 ```
 
@@ -201,7 +255,7 @@ OUTPUT_PATH = "/path/to/DNA-Diff/dataset/NightReID_Market1501"
 NUM_GROUPS  = 10
 ```
 
-```bash
+```
 python Preprocess/group_by_lighting.py
 ```
 
@@ -218,7 +272,7 @@ dataset/NightReID_Market1501/
 
 ### 4.3 Append Market-1501 as the daytime camera
 
-```bash
+```
 python Preprocess/market2nightreid.py \
     --market_gt_bbox_dir  /path/to/Market-1501-v15.09.15/gt_bbox \
     --nightreid_dir       dataset/NightReID_Market1501/ \
@@ -232,13 +286,15 @@ Market identities with at least `--min_images_per_id` images are copied to
 `cam7/env61/` and relabelled starting at `max_nightreid_id + 1` (so `0501`,
 `0502`, …); `exp/train_id.txt` is appended in place.
 
+> [!IMPORTANT]
+>
 > `--max_nightreid_id` must match the highest identity produced in 4.2,
 > otherwise identities collide. The same value is reused at generation time as
 > `--threshold`, which tells the sampler which identities are the daytime ones.
 
 ### 4.4 Convert to a HuggingFace dataset
 
-```bash
+```
 python Preprocess/c2hf.py \
     --dataset     NightReID_Market1501 \
     --base_path   dataset/NightReID_Market1501 \
@@ -275,7 +331,7 @@ environment variable, which the shell wrappers set for you. Run everything from
 
 ### 5.1 Run the whole pipeline
 
-```bash
+```
 cd Data_Generation
 GPU_IDS="0,1,2" bash scripts/finetune_all.sh \
     ../dataset/NightReID_Market1501/ \
@@ -307,7 +363,7 @@ needs, and logs to `<data_dir>/finetune_model/logs/stepN_<timestamp>.log`.
 Use the same `finetune_all.sh`, just narrowing `steps` — either as the `STEPS`
 environment variable or as the third positional argument:
 
-```bash
+```
 cd Data_Generation
 
 STEPS="1"   bash scripts/finetune_all.sh      # stage 1 only
@@ -325,6 +381,8 @@ Stages 2 and 3 are not standalone — they load the previous stage's weights.
 _"Run step 1 first, or add it to STEPS"_ rather than failing part-way into
 training, so a missing prerequisite costs you seconds, not hours.
 
+> [!NOTE]
+>
 > **Re-running a finished stage resumes, it does not restart.** > `--resume_from_checkpoint` defaults to `"latest"`, so the script finds the
 > existing checkpoint, loads it, and exits almost immediately because
 > `global_step` already equals `max_train_steps`. To genuinely retrain a stage,
@@ -366,10 +424,16 @@ cannot fix them.
 If you only want to generate images, you can skip §5 entirely and download the
 released weights instead.
 
-**Download:** _to be published — link TBA._
+**Download:** <https://huggingface.co/manhtoanbui01/DNA-Diff> — `finetune_model.tar.gz` (1.86 GB)
 
-Inference reads exactly four files. Unpack them under your `data_dir` at these
-paths, which are hard-coded (§5.4):
+```
+cd dataset/NightReID_Market1501/
+wget https://huggingface.co/manhtoanbui01/DNA-Diff/resolve/main/finetune_model.tar.gz
+tar -xzf finetune_model.tar.gz
+```
+
+The archive holds the full `finetune_model/` tree. Of it, inference reads only
+these four files:
 
 ```
 dataset/NightReID_Market1501/finetune_model/
@@ -391,7 +455,7 @@ Then run generation as in §6, but pass `true` as the **7th argument**
 (`use_pretrained_weights`) — this is the one difference from generating with
 weights you trained yourself:
 
-```bash
+```
 cd Data_Generation
 source scripts/sample.sh
 sample \
@@ -403,6 +467,8 @@ sample \
 #          ^^^^ use_pretrained_weights
 ```
 
+> [!WARNING]
+>
 > **⚠️ The weights are tied to one specific dataset build.** > `Preprocess/c2hf.py` assigns each camera a _random_ 4-character pseudo-word on
 > every run (`generate_unique_descriptions()`, unseeded). How many CLIP tokens
 > that word splits into decides how many `<env_{N}_{i}>` tokens exist per camera
@@ -413,6 +479,8 @@ sample \
 > `camera_environment_description_mappings_<dataset>.json` published alongside
 > the weights, rather than regenerating one.
 
+> [!NOTE]
+>
 > **On `use_pretrained_weights`** (argument 7 of `sample`, default `false`):
 > setting it `true` replaces the per-camera token counts read from your dataset
 > metadata with a fixed `{cam1:3, cam2:2, cam3:4, cam4:2, cam5:3, cam6:3}`.
@@ -425,25 +493,35 @@ sample \
 
 ---
 
----
-
 ## 6. Generation
 
-```bash
+```
 cd Data_Generation
 source scripts/sample.sh
-sample \
-    /abs/path/to/dataset/NightReID_Market1501/ \
-    /abs/path/to/dataset/NightReID_Market1501/cam7/env61/ \
-    /abs/path/to/stable-diffusion-v1-5 \
-    /abs/path/to/output_dir \
+sample  <dataset_root>  <daytime_crops>  <sd_model>  <output_dir>
 ```
 
-Images are written as:
+| #   | Argument         | Example                                   |
+| --- | ---------------- | ----------------------------------------- |
+| 1   | dataset root     | `dataset/NightReID_Market1501/`           |
+| 2   | daytime crops    | `dataset/NightReID_Market1501/cam7/env61/`|
+| 3   | base SD-1.5      | `stable-diffusion-v1-5`                   |
+| 4   | output directory | `outputs/`                                |
 
-```
-<output_dir>/<camN>/<id:04d>/<env_id>_<n>.jpg
-```
+Images land at `<output_dir>/<camN>/<id:04d>/<env_id>_<n>.jpg`. Every
+`<env_N_i>` token is sampled in turn, so one identity comes back across the
+full range of lighting conditions:
+
+<p align="center">
+  <img src="figures/illumination_diversity.png" width="85%"
+       alt="One identity generated across many lighting conditions">
+</p>
+
+> [!TIP]
+>
+> Don't want to run this? Download our generated images instead —
+> [`generated_images.tar.gz`](https://huggingface.co/manhtoanbui01/DNA-Diff) (260 MB),
+> then continue from §7.
 
 ---
 
@@ -455,7 +533,7 @@ Flatten the generated tree into Market-1501 filename conventions
 Copy them straight into the NightReID training split, so the synthetic images
 sit alongside the real night-time ones:
 
-```bash
+```
 python move_synthetic_market1501.py \
     -i /abs/path/to/output_dir \
     -o /path/to/NightReID/bounding_box_train/
@@ -464,6 +542,8 @@ python move_synthetic_market1501.py \
 The target directory must already exist — the script only copies into it, it
 does not create it. Train any downstream ReID model on that folder as usual.
 
+> [!NOTE]
+>
 > Synthetic identities are offset by **+10000**, so they cannot collide with the
 > real NightReID identities (which top out around 1500).
 
@@ -485,14 +565,25 @@ are baked into the source and must be edited:
 
 ## 9. Troubleshooting
 
-**`ValueError: HUG_LOCAL_IMAGE_TRAIN_DIR env variable is not set.`**
-You ran a training/generation script directly. Use the wrappers in
-`Data_Generation/scripts/`, or `export HUG_LOCAL_IMAGE_TRAIN_DIR=/abs/path/to/dataset/NightReID_Market1501/`.
+<details>
+<summary><b><code>ValueError: HUG_LOCAL_IMAGE_TRAIN_DIR env variable is not set.</code></b></summary>
 
-**`FileNotFoundError: deep_person_reid/osnet_ain_ms_d_m.pth.tar`**
+You ran a training/generation script directly. Use the wrappers in
+`Data_Generation/scripts/`, or
+`export HUG_LOCAL_IMAGE_TRAIN_DIR=/abs/path/to/dataset/NightReID_Market1501/`.
+
+</details>
+
+<details>
+<summary><b><code>FileNotFoundError: deep_person_reid/osnet_ain_ms_d_m.pth.tar</code></b></summary>
+
 The OSNet path is relative — run from `Data_Generation/`, and check §3.4.
 
-**`ModuleNotFoundError: No module named 'torchreid'`**
+</details>
+
+<details>
+<summary><b><code>ModuleNotFoundError: No module named 'torchreid'</code></b></summary>
+
 Raised from `deep_person_reid/torchreid/__init__.py`, which imports `torchreid`
 absolutely. It means `Data_Generation/deep_person_reid/` is not on `sys.path`.
 The two scripts that use OSNet add it themselves, so this normally only appears
@@ -502,14 +593,62 @@ code. Fix it with
 `Data_Generation/`. Installing PyPI `torchreid` also makes the error go away,
 but it is the wrong package — see §3.4.
 
-**`ImportError` from `diffusers.models.attention_processor`**
+</details>
+
+<details>
+<summary><b><code>ImportError</code> from <code>diffusers.models.attention_processor</code></b></summary>
+
 `diffusers` is not at 0.23.1. Reinstall with `pip install diffusers==0.23.1`.
 
-**Stage 2 or 3 fails loading the previous stage's checkpoint**
+</details>
+
+<details>
+<summary><b>Stage 2 or 3 fails loading the previous stage's checkpoint</b></summary>
+
 The step counts in the hard-coded paths do not match what you trained. See §5.4.
 
-**`accelerate` uses the wrong GPUs**
+</details>
+
+<details>
+<summary><b><code>accelerate</code> uses the wrong GPUs</b></summary>
+
 `GPU_IDS` and `CUDA_VISIBLE_DEVICES` are both set. Use only `GPU_IDS`.
 
-**OOM during training**
-Lower `batchsize` (arg 5 of `finetune`) and/or `rank` (arg 7)
+</details>
+
+<details>
+<summary><b>OOM during training</b></summary>
+
+Lower `batchsize` (arg 5 of `finetune`) and/or `rank` (arg 7).
+
+</details>
+
+---
+
+## Citation
+
+If you find this work useful, please cite:
+
+```bibtex
+@inproceedings{dnadiff2026,
+  title     = {Lighting-Aware Diffusion-based Data Augmentation for Robust Low-Light Re-Identification},
+  author    = {TBA},
+  booktitle = {British Machine Vision Conference (BMVC)},
+  year      = {2026}
+}
+```
+
+---
+
+## Acknowledgements
+
+This project builds on several excellent open-source works:
+
+- [**DiVE**](https://github.com/BorgDiven/DiVE) — the codebase this implementation
+  is built on, and the main baseline in the comparisons above
+- [**Stable Diffusion v1.5**](https://huggingface.co/stable-diffusion-v1-5/stable-diffusion-v1-5)
+  and [**diffusers**](https://github.com/huggingface/diffusers) — the text-to-image backbone
+- [**deep-person-reid**](https://github.com/KaiyangZhou/deep-person-reid) — OSNet identity features
+- [**IP-Adapter**](https://github.com/tencent-ailab/IP-Adapter) — image-prompt cross-attention, adapted in `lora_ipadapter.py`
+- [**NightReID**](https://github.com/msm8976/NightReID) and
+  [**Market-1501**](https://zheng-lab-anu.github.io/Project/project_reid.html) — datasets
