@@ -30,6 +30,7 @@ camera and a specific lighting condition:
 
 <p align="center">
   <img src="figures/pipeline.png" width="85%">
+  <em>Overview of the DNA-Diff architecture.</em>
 </p>
 
 | Stage | Script                                   | What it learns                                                                                                                                  |
